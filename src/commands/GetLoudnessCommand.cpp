@@ -166,6 +166,68 @@ bool GetLoudnessCommand::Apply( const CommandContext &context )
 
       const bool belowGate = ( linearLoudness == 0.0 );
 
+      // ── sliding-window max loudness (short-term and momentary) ────────────
+      // These are sliding-window maxima computed using EBUR128's gated integrated
+      // loudness over each window — a practical approximation of true ungated
+      // momentary/short-term loudness as described in EBU R128 §2.2-§2.3.
+      // short_term: 3.0 s window / 1.0 s hop
+      // momentary:  0.4 s window / 0.1 s hop
+      struct WindowDef { double winSec; double hopSec; };
+      const WindowDef wdefs[2] = { { 3.0, 1.0 }, { 0.4, 0.1 } };
+      double maxLufs[2] = { -999.0, -999.0 };
+
+      for ( int wi = 0; wi < 2; ++wi )
+      {
+         const double winSec = wdefs[wi].winSec;
+         const double hopSec = wdefs[wi].hopSec;
+         const double selLen = t1 - t0;
+
+         if ( selLen < winSec )
+         {
+            // Selection shorter than window — emit sentinel (-999.0)
+            maxLufs[wi] = -999.0;
+            continue;
+         }
+
+         // Slide windows across [t0, t1]
+         double winStart = t0;
+         while ( winStart + winSec <= t1 + 1e-9 )
+         {
+            const double winEnd = std::min( winStart + winSec, t1 );
+            const sampleCount ws0 = wt->TimeToLongSamples( winStart );
+            const sampleCount ws1 = wt->TimeToLongSamples( winEnd );
+
+            EBUR128 winMeter( rate, nChannels );
+
+            auto wpos = ws0;
+            while ( wpos < ws1 )
+            {
+               auto block = limitSampleBufferSize(
+                  channels[0]->GetBestBlockSize( wpos ), ws1 - wpos );
+               for ( size_t ch = 0; ch < nChannels; ++ch )
+                  channels[ch]->GetFloats( bufs[ch].get(), wpos, block );
+               for ( size_t i = 0; i < block; ++i )
+               {
+                  for ( size_t ch = 0; ch < nChannels; ++ch )
+                     winMeter.ProcessSampleFromChannel( bufs[ch][i], ch );
+                  winMeter.NextSample();
+               }
+               wpos += block;
+            }
+
+            const double wLinear = winMeter.IntegrativeLoudness();
+            if ( wLinear > 0.0 )
+            {
+               const double wLufs = winMeter.IntegrativeLoudnessToLUFS( wLinear );
+               if ( std::isfinite(wLufs) && wLufs > maxLufs[wi] )
+                  maxLufs[wi] = wLufs;
+            }
+
+            winStart += hopSec;
+            if ( winStart + winSec > t1 + 1e-9 ) break;
+         }
+      }
+
       // ── emit JSON struct ──────────────────────────────────────────────────
       context.StartStruct();
       context.AddItem( wt->GetName(),          wxT("name") );
@@ -174,6 +236,8 @@ bool GetLoudnessCommand::Apply( const CommandContext &context )
       context.AddItem( t0,                     wxT("start") );
       context.AddItem( t1,                     wxT("end") );
       context.AddItem( lufs,                   wxT("lufs_integrated") );
+      context.AddItem( maxLufs[0],             wxT("short_term_max_lufs") );
+      context.AddItem( maxLufs[1],             wxT("momentary_max_lufs") );
       context.AddItem( belowGate ? wxString(wxT("below_gate")) : wxString(wxT("")),
                                                wxT("warning") );
       context.EndStruct();

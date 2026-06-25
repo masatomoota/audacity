@@ -78,10 +78,13 @@ void GetAudioStatsCommand::PopulateOrExchange( ShuttleGui &S )
 
 namespace {
 // Emit one JSON struct of statistics for a single channel.
+// truePeakLinear / truePeakDBFS are the 4x-oversampled inter-sample true-peak
+// (Catmull-Rom cubic interpolation approximation of ITU BS.1770 true-peak).
 void EmitStats( const CommandContext &context, const wxString &name,
    int trackIndex, int channelIndex, int nChannels, double sampleRate,
    double t0, double t1, double nSamples, double peakLinear, double peakDBFS,
-   double rmsLinear, double rmsDBFS, double dcOffset, double clipCount )
+   double rmsLinear, double rmsDBFS, double dcOffset, double clipCount,
+   double truePeakLinear, double truePeakDBFS )
 {
    context.StartStruct();
    context.AddItem( name,                  wxT("name") );
@@ -98,6 +101,8 @@ void EmitStats( const CommandContext &context, const wxString &name,
    context.AddItem( rmsDBFS,               wxT("rms_dbfs") );
    context.AddItem( dcOffset,              wxT("dc_offset") );
    context.AddItem( clipCount,             wxT("clip_count") );
+   context.AddItem( truePeakLinear,        wxT("truepeak_linear") );
+   context.AddItem( truePeakDBFS,          wxT("truepeak_dbfs") );
    context.EndStruct();
 }
 }
@@ -148,7 +153,8 @@ bool GetAudioStatsCommand::Apply( const CommandContext &context )
             (void)channel;
             EmitStats( context, wt->GetName(), trackIndex, channelIndex,
                nChannels, sampleRate, t0, t1, 0.0,
-               0.0, kSilenceFloor, 0.0, kSilenceFloor, 0.0, 0.0 );
+               0.0, kSilenceFloor, 0.0, kSilenceFloor, 0.0, 0.0,
+               0.0, kSilenceFloor );
             ++channelIndex;
          }
          ++trackIndex;
@@ -165,11 +171,41 @@ bool GetAudioStatsCommand::Apply( const CommandContext &context )
       int channelIndex = 0;
       for ( const auto &channel : wt->Channels() )
       {
-         float  peakLinear = 0.0f;
-         double sumSq      = 0.0;   // for RMS
-         double sampleSum  = 0.0;   // for DC offset
-         long   clipCount  = 0;
-         long   nSamples   = 0;
+         float  peakLinear    = 0.0f;
+         float  truePeakLin   = 0.0f; // 4x-oversampled inter-sample true-peak (Catmull-Rom)
+         double sumSq         = 0.0;  // for RMS
+         double sampleSum     = 0.0;  // for DC offset
+         long   clipCount     = 0;
+         long   nSamples      = 0;
+
+         // Catmull-Rom true-peak: we maintain a 4-sample sliding history
+         // [p0, p1, p2, p3] where p1-p2 is the current pair being interpolated.
+         // Between each consecutive pair (p1, p2) we compute 3 equally-spaced
+         // interior points at t=0.25, 0.5, 0.75, making this a 4x oversampling
+         // approximation of the ITU BS.1770 inter-sample true-peak estimator.
+         float hist[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+         int   histFill = 0; // how many real samples have been loaded into history
+
+         // Catmull-Rom: P(t) = 0.5 * ((2*p1) + (-p0+p2)*t
+         //                           + (2*p0-5*p1+4*p2-p3)*t^2
+         //                           + (-p0+3*p1-3*p2+p3)*t^3)
+         // Compute 3 interior points at t=0.25, 0.5, 0.75 (4x oversampling).
+         auto updateTruePeak = [&]( float p0, float p1, float p2, float p3 ) {
+            static const float ts[3] = { 0.25f, 0.5f, 0.75f };
+            for ( int ti = 0; ti < 3; ++ti )
+            {
+               const float t  = ts[ti];
+               const float t2 = t * t;
+               const float t3 = t2 * t;
+               const float v  = 0.5f * (
+                     (2.0f * p1)
+                  + (-p0 + p2) * t
+                  + (2.0f*p0 - 5.0f*p1 + 4.0f*p2 - p3) * t2
+                  + (-p0 + 3.0f*p1 - 3.0f*p2 + p3) * t3 );
+               const float av = std::fabs(v);
+               if ( av > truePeakLin ) truePeakLin = av;
+            }
+         };
 
          auto position = s0;
          while ( position < s1 )
@@ -186,6 +222,21 @@ bool GetAudioStatsCommand::Apply( const CommandContext &context )
                if ( a >= MAX_AUDIO ) ++clipCount;
                sumSq     += (double)v * (double)v;
                sampleSum += v;
+
+               // Shift history and try to compute Catmull-Rom interpolation.
+               // We need 4 samples: hist[0..3] = [p0, p1, p2, p3].
+               // Interpolation is over the interval [p1, p2].
+               hist[0] = hist[1];
+               hist[1] = hist[2];
+               hist[2] = hist[3];
+               hist[3] = v;
+               if ( histFill < 3 )
+                  ++histFill;
+               else
+                  updateTruePeak( hist[0], hist[1], hist[2], hist[3] );
+
+               // Also track the true-peak of the samples themselves
+               if ( a > truePeakLin ) truePeakLin = a;
             }
             nSamples += (long)block;
             position += block;
@@ -195,17 +246,20 @@ bool GetAudioStatsCommand::Apply( const CommandContext &context )
                   ( position - s0 ).as_double() / windowLen.as_double() );
          }
 
-         const double rmsLinear = ( nSamples > 0 ) ? std::sqrt( sumSq / nSamples ) : 0.0;
-         const double dcOffset  = ( nSamples > 0 ) ? ( sampleSum / nSamples ) : 0.0;
-         const double peakDBFS  = ( peakLinear > 0.0f )
+         const double rmsLinear      = ( nSamples > 0 ) ? std::sqrt( sumSq / nSamples ) : 0.0;
+         const double dcOffset       = ( nSamples > 0 ) ? ( sampleSum / nSamples ) : 0.0;
+         const double peakDBFS       = ( peakLinear > 0.0f )
             ? LINEAR_TO_DB( (double)peakLinear ) : kSilenceFloor;
-         const double rmsDBFS   = ( rmsLinear > 0.0 )
+         const double rmsDBFS        = ( rmsLinear > 0.0 )
             ? LINEAR_TO_DB( rmsLinear ) : kSilenceFloor;
+         const double truePeakDBFS   = ( truePeakLin > 0.0f )
+            ? LINEAR_TO_DB( (double)truePeakLin ) : kSilenceFloor;
 
          EmitStats( context, wt->GetName(), trackIndex, channelIndex,
             nChannels, sampleRate, t0, t1, (double)nSamples,
             (double)peakLinear, peakDBFS, rmsLinear, rmsDBFS,
-            dcOffset, (double)clipCount );
+            dcOffset, (double)clipCount,
+            (double)truePeakLin, truePeakDBFS );
 
          ++channelIndex;
       }

@@ -210,8 +210,74 @@ LLM が音を**数値で判断**できるよう、コア `src/commands/GetAudioS
 - `DetectOnsets:`（`Threshold` dB=6, `WindowMs`=20, `UseSelection`）— エネルギー立上りでアタック時刻 `onsets:[{time}]`。検証: 無音明け t=2.0 検出。
 - `GetLoudness:`（`UseSelection`）— `EBUR128`(lib-math) で統合ラウドネス `lufs_integrated`。<400ms は `warning="below_gate"`。検証: -10.4 LUFS。
 
-**設計原則**: 全コマンド「集約された派生指標を JSON で返す」（生サンプル列は LLM が扱えない）。`SpectrumAnalyst`(lib-fft)・`EBUR128`(lib-math) は既存実装を再利用。これで LLM はレベル/クリップ/無音/DC/スペクトル/ラウドネス/アタックを数値判断できる。さらなる候補: 真ピーク(true-peak)、短期/瞬時ラウドネス、`CompareAudio` 強化。
+**設計原則**: 全コマンド「集約された派生指標を JSON で返す」（生サンプル列は LLM が扱えない）。`SpectrumAnalyst`(lib-fft)・`EBUR128`(lib-math) は既存実装を再利用。これで LLM はレベル/クリップ/無音/DC/スペクトル/ラウドネス/アタックを数値判断できる。
+
+### 10.1 精密化（追加済み・実機検証済み）
+- **`GetAudioStats` に true-peak**: `truepeak_linear`/`truepeak_dbfs` を追加（4倍オーバーサンプル相当の Catmull-Rom 補間ピーク、ITU BS.1770 true-peak の近似）。440Hz/0.5 sine では truepeak == peak == 0.5 = -6.02dBFS（超ナイキスト下なので overshoot 無し＝物理的に正しい）。
+- **`GetLoudness` に short-term / momentary 最大値**: `short_term_max_lufs`（窓 3.0s / hop 1.0s）、`momentary_max_lufs`（窓 0.4s / hop 0.1s）を追加。各窓ごとに `EBUR128` を新規にインスタンス化して `IntegrativeLoudness()→IntegrativeLoudnessToLUFS()` を採り最大値を保持する近似。定常 sine（4s, 0.5 amp）で integrated=-9.71, st_max=-9.71, m_max=-9.71（一致）。
+- 留意: EBU R128 仕様では momentary/short-term は K-加重した square sum を 0.4s/3.0s ウィンドウで平均する形（ゲーティングなし）が正式。当実装は EBUR128 のゲート積分を窓ごとに再走査する簡便近似で、定常信号では正しく、変動信号では実機メータより数 dB シビアに出ることがある。完全準拠が要るなら lib-math 側に窓平均インターフェースを足すのが筋。
+
+### 10.2 次の知覚候補
+- 真ピーク厳密化（4x→64x オーバーサンプル、polyphase FIR）。
+- ノイズフロア / SNR 推定（DetectSilence の窓 RMS 分布から）。
+- ピッチ推定（autocorrelation, lib-time-and-pitch の YIN 系を再利用できるか調査）。
+- `CompareAudio` 強化（before/after の dB 差、相関、SNR）。
 
 ---
 
-*End of Phase 0 implementation handoff. 次の LLM へ：§5 の手順でビルド→有効化→検証を再現でき、§7 の Phase 1（`get_info`→`tools/list` 自動生成）から続行できる。アプリ内チャットは §9 のコンパニオン方式で完成済み。Phase 2 知覚は §10 の `GetAudioStats` を起点に拡張できる。*
+## 11. 次の LLM への明示的引き継ぎ（このチャット直系の続行手順）
+
+### 11.1 直前まで完了している状態（commit `9681910e6` + 未コミットの true-peak/STM enhancement）
+このハンドオフ更新と同じコミットに、§10.1 の true-peak / ST-M loudness 強化を含めて push する。push 後の fork `mcp-llm` HEAD で次の LLM がそのまま続行可能。
+
+### 11.2 次に着手すべき: Phase 1 = `tools/list` 自動生成（**原典 §4.3 の最大の差別化、未着手**）
+現状 `mod-mcp-server` の `tools/list` は **静的に 2 ツール**（`run_command`/`get_info`）しか返さない。Audacity 側は既に `GetInfo: Type=Commands Format=JSON` で**完全な機械可読カタログ**（id / name / params[ key, type, default, enum ]）を 65KB 程度出してくる（実証済み）。これを **JSON-Schema にマップして約 250 ツールを手書きゼロで生成**するのが Phase 1 のゴール。
+
+**実装場所**: `modules/scripting/mod-mcp-server/MCPHttpServer.cpp` のみを変更（他は触らない）。
+- 既存の `MCPHttpServer::ExecCommand(std::string)` は HTTP worker から AppCommandEvent + wxSemaphore でメインスレッド実行＝中から `"GetInfo: Type=Commands Format=JSON"` を流せる。
+- 出力末尾の `"\nBatchCommand finished: OK\n"` を strip してから nlohmann::json でパース（`json.hpp` は既に同モジュールにベンダー済み）。
+
+**ステップ**:
+1. `BuildToolCatalog()` を新設（lazy + 単一実行ガード、`std::once_flag` か mutex 付き bool）。`HandleToolsList` の先頭で呼ぶ。
+2. カタログの各エントリを MCP ツール記述子に変換:
+   - `name` = command id を MCP 名規約に正規化（英数字/`_`/`-`、スペース→`_`）。**逆引きマップ**（mcpName → audacity command id）を保持。
+   - `description` = entry の `name`/`tip` から構築。
+   - `inputSchema.type = "object"`。`properties` は params から構築（型対応表：`double`→`{type:"number"}`、`int`→`{type:"integer"}`、`bool`→`{type:"boolean"}`、`string`→`{type:"string"}`、`enum`→`{type:"string", enum:[...]}`）。`additionalProperties: false`。`required` は基本的に空（Audacity 側パラメータはオプショナル）。
+3. `HandleToolsList` を「既存 run_command/get_info」＋「生成ツール群」の連結に。
+4. `HandleToolsCall` で生成ツール名が来たら **コマンド文字列リコンストラクト**:
+   - `"<CommandId>: key1=val1 key2=\"val with space\" ..."` の形式。
+   - 文字列はスペース含む場合のみダブルクォート。
+   - **boolean は Audacity の `AddBool` のクォート癖**（`src/commands/CommandTargets.cpp` 参照、原典 handoff §3.5）に合わせる。実装時にまず `GetInfo: Type=Commands` の bool param 出力サンプルを見て決め打ちで合わせる。
+   - enum はそのままの文字列。
+   - 最後に `ExecCommand(cmdLine)` を呼んで結果を `tools/call` response に包む（既存 run_command の処理を再利用）。
+5. リスクと方針:
+   - `tools/list` レスポンス容量（〜250 ツール）はクライアントによっては重い → まずは典型的 `AudacityCommand`（〜29 個）だけ自動生成し、約 212 個のメニューコマンド（`GetInfo: Type=Menus`）は Phase 1.1 として後回しが安全。
+   - コマンド名が日本語 `name`（XO翻訳）を含む場合あり。MCP 名には**英語 id**を使うこと。
+   - 生成後は `mod-mcp-server` をリビルドし、コンパニオン (`mcp-companion`) から `tools/list` を叩いて確認 → 既知典型コマンド（`Select`, `Tone`, `Amplify`, `Export2`）を**生成ツールとして直接呼ぶ** e2e テスト。
+
+**仕様書下書きが残っているかも**: 私のセッション末で `/tmp/phase1_spec.md` 用の調査エージェントを起動しようとしたが、ツール書式が壊れて起動できなかった。`/tmp/phase1_spec.md` は存在しないので、上記ステップから実装してよい（既存ファイル `/tmp/perception_commands_spec.md`（41KB, Phase 2 用）と混同しない）。
+
+### 11.3 開発ループの作法（重要・節約のため）
+- 高い私（Opus 4.x）は**管理＋設計＋検証**に専念し、ファイル編集・ビルド・調査は **sonnet サブエージェント**にバックグラウンドで委譲する（`Agent` tool, `model: "sonnet"`, `run_in_background: true`）。同一スレッドで `subagent_tokens` が確認でき、コスト節約効果が大きい。
+- 複数並行・調査の合成は `Workflow` ツール（読み取り fan-out → 合成）が定石。**Ultracode 環境**では Workflow を積極的に使う。
+- 検証は私が curl で MCP を直叩きすればよい（接続先 `http://127.0.0.1:4830/mcp`）。
+
+### 11.4 リポ/ブランチ状態
+- 作業 worktree: `/Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-3x`（ブランチ `mcp-llm`）。
+- ビルド出力: `/Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-3x-build/RelWithDebInfo/Audacity.app`。
+- アプリは bundle 内 `Contents/Portable Settings/audacity.cfg` で `mod-mcp-server=1` 有効化済み（autoEnabledModules() に登録済み）。次の LLM はビルド後に普通に `open Audacity.app` するだけで MCP サーバが 4830 に立つ。
+- 同期先 fork: `github.com/masatomoota/audacity`、ブランチ `mcp-llm`。**公式 `origin`（`github.com/audacity/audacity`）には絶対に push しない**。
+
+### 11.5 既存コミット一覧（`mcp-llm` 上、新しい順）
+1. **`9681910e6`** commands: GetSpectrum / DetectSilence / DetectOnsets / GetLoudness（4種の知覚コマンド）
+2. **`7978fad9c`** commands: GetAudioStats（Phase 2 知覚の起点）
+3. **`04a3713a0`** mcp-companion: localhost チャットアプリ
+4. **`3daf865c2`** mod-mcp-server: default Enabled
+5. **`0dcafd75d`** mod-mcp-server: Phase 0 MCP/HTTP control surface
+6. (vendored deps コミットなど省略)
+
+未コミット作業（このセッション末で commit 予定）: GetAudioStats に truepeak、GetLoudness に short_term_max/momentary_max を追加（§10.1）＋ハンドオフ §10.1/§10.2/§11 追記。
+
+---
+
+*End of Phase 0 implementation handoff. 次の LLM へ：§5 の手順でビルド→有効化→検証を再現でき、§11 で次の作業（Phase 1 = `tools/list` 自動生成）に直接着手できる。アプリ内チャットは §9 のコンパニオン方式で完成済み。Phase 2 知覚は §10 の `GetAudioStats`/§10.1 の精密化を起点に拡張できる。*
