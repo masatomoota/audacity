@@ -171,22 +171,29 @@ tools/call 形式: `{"jsonrpc":"2.0","id":N,"method":"tools/call","params":{"nam
 
 **結論**: 「言葉で Audacity を操作するチャット」は Audacity 内蔵 UI ではなく **`mcp-companion/`（localhost Web チャット＝MCP クライアント）** で提供する。実機で OpenAI gpt-4o から `NewMonoTrack`→`Select`→`Tone`→`Amplify`→`Export2` を完通し `/tmp/companion_test.wav`（265KB 実オーディオ）生成を確認済み。
 
+> **現行版（更新）**: コンパニオンは API キー直叩きのエージェントループから **Codex app server（`codex app-server`）ベース**に作り替えた（§9.2）。これにより (1) **ChatGPT Web ログイン**（API キー不要）、(2) **会話メモリの永続化**（各会話を Codex の thread として disk に保存・一覧・再開）が得られる。Codex 自身がエージェントループを回し、隔離 `CODEX_HOME` 経由で Audacity の `mod-mcp-server` をツールとして呼ぶ。旧 API キー版は `mcp-companion/legacy/` に温存。
+
 ### 9.1 なぜ in-process モジュール（mod-ai-assistant）を断念したか
 - 試作した内蔵モジュールは **ビルドは通るが、dlopen でロードするだけで Audacity の project ウィンドウ起動を破壊**した（メインスレッドのイベントループは生きるが active project が作られず、プラグインスキャンも走らない＝ログ空）。A/B テストで「メニュー登録でも `AttachedWindows::RegisteredFactory` でもなく、モジュール .o の**静的初期化（ロード時）**」まで絞り込んだが根治に至らず時間超過。`lib-network-manager` は本体内蔵で専用 dylib を持たず（symbols は `-bundle_loader` 経由）、可視性/重複初期化が絡む難所。
 - **AU/VST プラグインも不可**: プラグインはオーディオ処理スロットで、ホスト（Audacity）を操作する API を持たない（トラック作成/エクスポート/コマンド実行ができず核が成立しない）。Audacity の VST は「選択範囲へのエフェクト」扱いで更に制約大。
 - → **MCP クライアントのコンパニオン**が最も堅牢: Audacity 起動を一切壊さず、既存の動く `mod-mcp-server` を再利用、Claude Desktop/Codex と同じ正攻法。撤去後フォークは **mod-mcp-server のみの clean 状態**（`autoEnabledModules()` も mod-mcp-server のみ）。
 
-### 9.2 コンパニオン構成（`mcp-companion/`, Python 3 stdlib のみ・pip 不要）
-- `server.py` — `127.0.0.1:8765` の Web サーバ＋**サーバ側エージェントループ**（Anthropic Messages / OpenAI chat-completions 両対応、ツール= `run_command`/`get_info`、最大12ラウンド）。`.env` 自動読込（`$ENV_FILE` → スクリプト dir → CWD、既存 env は上書きしない）。ルート: `GET /`, `GET /api/config`, `GET /api/mcp_status`, `POST /api/chat`。
-- `index.html` — チャット UI（会話バブル・ツール呼出の折りたたみ表示・MCP 接続インジケータ）。
-- `run.sh` / `README.md` / `.gitignore`（`.env` 除外）。
-- 設定(env): `AI_PROVIDER`(anthropic|openai), `AI_MODEL`(既定 claude-sonnet-4-6 / gpt-4o), `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`, `OPENAI_BASE_URL`(Ollama/LM Studio 等), `MCP_URL`(既定 `http://127.0.0.1:4830/mcp`)。**キーは `.env`（.gitignore 済み・コミットしない）か env で渡す。**
+### 9.2 コンパニオン構成（`mcp-companion/`, Python 3 stdlib のみ・pip 不要・Codex app server 版）
+アーキテクチャ: `Browser(index.html) ⇄ HTTP/SSE ⇄ server.py ⇄ JSON-RPC/stdio ⇄ codex app-server ⇄ MCP(streamable HTTP) ⇄ Audacity mod-mcp-server(:4830)`。
+- `codex_bridge.py` — `codex app-server` サブプロセスを 1 本所有する JSON-RPC 2.0(stdio, NDJSON) クライアント。同期 `request()`／`notify()`、stdout 通知を **thread 単位の購読キュー**へ配信、server→client の承認リクエストは防御的に自動応答。ログイン完了通知 (`account/login/completed`) も捕捉。
+- `server.py` — `127.0.0.1:8765` の Web サーバ。**隔離 `CODEX_HOME`**（既定 `mcp-companion/.codex`）に `config.toml` を生成し `[mcp_servers.audacity] url=…` だけを登録（ユーザのグローバル MCP サーバは混入しない）。既存の `codex login`（`~/.codex/auth.json`）を継承して再ログイン不要化。ルート: `GET /api/status`（Codex/Audacity/account）, `GET /api/threads`, `GET /api/thread?id=`, `POST /api/chat`（**SSE**: `delta`/`tool_start`/`tool_end`/`message`/`done`/`error`）, `POST /api/login`＋`GET /api/login/wait`, `POST /api/logout`, `POST /api/interrupt`。
+- `index.html` — ログインゲート＋スレッド履歴サイドバー＋ストリーミング・チャット UI。
+- `run.sh`（Codex CLI/Python を点検）/ `README.md`（Codex 版に刷新）/ `.gitignore`（`.env` と `.codex/` 除外）/ `legacy/`（旧 API キー版）。
+- 設定(env): `MCP_URL`(既定 `http://127.0.0.1:4830/mcp`), `COMPANION_PORT`(8765), `CODEX_BIN`(`codex`), `CODEX_MODEL`(任意・既定はアカウント既定), `CODEX_HOME_COMPANION`, `CODEX_WORKDIR`, `GLOBAL_CODEX_HOME`(ログイン継承元), `CODEX_SANDBOX`(既定 `danger-full-access`)。
+- **重要(sandbox)**: 生成 `config.toml` は `approval_policy="never"` ＋ `sandbox_mode="danger-full-access"`。Codex の制限サンドボックス(`read-only`/`workspace-write`)では **エージェントの MCP-over-HTTP 呼び出し（localhost:4830）がブロックされ tool が空/"rejected" になる**。localhost のユーザ駆動・home 隔離・developer instructions で shell/file 禁止のため full-access を許容（`CODEX_SANDBOX` で変更可）。
 
 ### 9.3 使い方
 1. Audacity（mod-mcp-server 有効）を起動（初回はプラグインスキャン完了まで待つ）。
-2. `cd mcp-companion && ./run.sh`（または `python3 server.py`）→ ブラウザで `http://127.0.0.1:8765`。
-3. チャットで「440Hzのトーンを3秒作って半分の音量にして書き出して」等と指示すると、LLM が `run_command`/`get_info` 経由で Audacity を駆動。
-- 既知の小欠点: 非ストリーミング(v1)。`Export2` は `.wav` 指定でも AIFF を書くことがある（Audacity 側 Export2 の癖、コンパニオン無関係）。
+2. （初回のみ）`codex login` で ChatGPT にサインイン。companion がこれを自動継承する。未ログインなら UI の「Log in with ChatGPT」から OAuth。
+3. `cd mcp-companion && ./run.sh`（または `python3 server.py`）→ ブラウザで `http://127.0.0.1:8765`。
+4. チャットで「440Hzのトーンを3秒作って半分の音量にして書き出して」等と指示すると、Codex が `run_command`/`get_info` 経由で Audacity を駆動。応答はトークン・ストリーミング。会話は thread として保存され、サイドバーから再開可（=記憶）。
+- 実機検証(本セッション): ChatGPT ログイン、`get_info`/`run_command`（読み取り＋ Select/FadeIn の書き込み）、ストリーミング、`thread/list`、過去 thread を resume して記憶を保持していることを確認。
+- 既知の小欠点: 既定モデル/効率がアカウント既定（例 gpt-5.5 / xhigh）だと 1 ターンが重い → `CODEX_MODEL` か `config.toml` の `model_reasoning_effort` で調整。`Export2` は `.wav` 指定でも AIFF を書くことがある（Audacity 側 Export2 の癖、コンパニオン無関係）。
 
 ---
 
