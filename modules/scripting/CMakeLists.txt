@@ -8,6 +8,7 @@ A directory containing module targets
 # that it depends on
 set( MODULES
    mod-script-pipe
+   mod-mcp-server
 )
 
 audacity_module_subdirectory("${MODULES}")
