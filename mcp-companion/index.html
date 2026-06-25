@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Audacity Companion · Codex</title>
+<title>Audacity コンパニオン · Codex</title>
 <style>
   :root {
     --bg: #0e1116; --panel: #161b22; --panel2: #1c232d; --border: #2a313c;
@@ -115,17 +115,17 @@
 </head>
 <body>
   <aside id="sidebar">
-    <h1>Audacity <span>Companion</span></h1>
-    <button id="newchat">+ New chat</button>
+    <h1>Audacity <span>コンパニオン</span></h1>
+    <button id="newchat">+ 新規チャット</button>
     <div id="threads"></div>
-    <div id="sidefoot">Powered by <b>Codex app-server</b><br/><span id="modelinfo"></span></div>
+    <div id="sidefoot"><b>Codex app-server</b> 搭載<br/><span id="modelinfo"></span></div>
   </aside>
 
   <section id="main">
     <div id="statusbar">
       <span class="chip"><span id="d-audacity" class="dot"></span> Audacity</span>
       <span class="chip"><span id="d-codex" class="dot"></span> Codex</span>
-      <span id="authchip" class="chip"><span id="d-auth" class="dot"></span> <span id="authtext">checking…</span></span>
+      <span id="authchip" class="chip"><span id="d-auth" class="dot"></span> <span id="authtext">確認中…</span></span>
       <span id="grow"></span>
       <span id="modelchip" class="chip"></span>
     </div>
@@ -134,11 +134,11 @@
 
     <div id="composer">
       <div id="composer-inner">
-        <textarea id="input" placeholder="Tell Audacity what to do…  (e.g. “make a 440 Hz tone for 3s, normalize, export to /tmp/out.wav”)"></textarea>
-        <button id="send">Send</button>
-        <button id="stop">Stop</button>
+        <textarea id="input" placeholder="Audacity に指示を入力…（例：440Hz のサイン波を 3 秒生成してノーマライズし /tmp/out.wav にエクスポート）"></textarea>
+        <button id="send">送信</button>
+        <button id="stop">停止</button>
       </div>
-      <div class="hint">Enter to send · Shift+Enter for newline · conversations are saved as Codex threads</div>
+      <div class="hint">Enter で送信 · Shift+Enter で改行 · 会話は Codex スレッドとして保存されます</div>
     </div>
   </section>
 
@@ -156,13 +156,13 @@ function showEmpty() {
   clearChat();
   const div = document.createElement("div");
   div.className = "empty";
-  div.innerHTML = `<h2>What should we do in Audacity?</h2>
-    <p>I drive Audacity through its MCP tools — generate, edit, measure, and export audio.</p>
+  div.innerHTML = `<h2>Audacity で何をしますか？</h2>
+    <p>MCP ツールを通じて Audacity を操作します — 音声の生成・編集・計測・エクスポートが可能です。</p>
     <div class="examples">
-      <button>Create a 3-second 440 Hz sine tone and normalize it</button>
-      <button>How many tracks are open right now?</button>
-      <button>Measure the loudness (LUFS) and true-peak of the selection</button>
-      <button>Add a 0.5s fade-in and fade-out, then export to /tmp/out.wav</button>
+      <button>440Hz のサイン波を 3 秒生成してノーマライズする</button>
+      <button>現在開いているトラック数を教えて</button>
+      <button>選択範囲のラウドネス（LUFS）とトゥルーピークを計測する</button>
+      <button>フェードイン・フェードアウトを 0.5 秒ずつ追加して /tmp/out.wav にエクスポートする</button>
     </div>`;
   chatInner.appendChild(div);
   div.querySelectorAll(".examples button").forEach(b =>
@@ -178,7 +178,7 @@ function msgEl(role) {
   b.className = "bubble";
   const who = document.createElement("div");
   who.className = "who";
-  who.textContent = role === "user" ? "You" : "Audacity Companion";
+  who.textContent = role === "user" ? "あなた" : "Audacity コンパニオン";
   const body = document.createElement("div");
   body.className = "body";
   b.appendChild(who); b.appendChild(body);
@@ -220,14 +220,14 @@ function toolCard(d, running) {
   el.querySelector(".args").textContent = d.arguments ? JSON.stringify(d.arguments) : "";
   const st = el.querySelector(".st");
   const tb = el.querySelector(".tbody");
-  if (running) { st.innerHTML = '<span class="spin"></span>'; tb.innerHTML = "<b>running…</b>"; }
+  if (running) { st.innerHTML = '<span class="spin"></span>'; tb.innerHTML = "<b>実行中…</b>"; }
   else {
     const okStatus = d.status === "completed";
     st.textContent = okStatus ? "✓" : "✕";
     st.style.color = okStatus ? "var(--accent2)" : "var(--danger)";
     let body = "";
-    if (d.arguments) body += "<b>args:</b> " + escapeHtml(JSON.stringify(d.arguments)) + "\n\n";
-    body += "<b>result:</b>\n" + escapeHtml(d.result || "(no output)");
+    if (d.arguments) body += "<b>引数:</b> " + escapeHtml(JSON.stringify(d.arguments)) + "\n\n";
+    body += "<b>結果:</b>\n" + escapeHtml(d.result || "（出力なし）");
     tb.innerHTML = body;
   }
   scrollDown();
@@ -253,32 +253,32 @@ async function refreshStatus() {
       authtext.textContent = acc.type;
       const b = $("#loginbtn"); if (b) b.remove();
     } else {
-      authtext.textContent = "Not logged in";
+      authtext.textContent = "未ログイン";
       if (!$("#loginbtn")) {
-        const btn = document.createElement("button"); btn.id = "loginbtn"; btn.textContent = "Log in with ChatGPT";
+        const btn = document.createElement("button"); btn.id = "loginbtn"; btn.textContent = "ChatGPT でログイン";
         btn.onclick = doLogin; $("#authchip").appendChild(btn);
       }
     }
-    $("#modelchip").textContent = s.model ? ("model: " + s.model) : "model: account default";
+    $("#modelchip").textContent = s.model ? ("モデル: " + s.model) : "モデル: アカウント既定";
     $("#modelinfo").textContent = s.audacityTools && s.audacityTools.length
-      ? ("Audacity tools: " + s.audacityTools.join(", ")) : "Audacity not connected";
+      ? ("Audacity ツール: " + s.audacityTools.join(", ")) : "Audacity 未接続";
   } catch (e) { /* ignore */ }
 }
 
 async function doLogin() {
-  const btn = $("#loginbtn"); if (btn){ btn.textContent = "Opening browser…"; btn.disabled = true; }
+  const btn = $("#loginbtn"); if (btn){ btn.textContent = "ブラウザを開いています…"; btn.disabled = true; }
   try {
     const r = await fetch("/api/login", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({})});
     const d = await r.json();
-    if (d.error) { alert("Login error: " + d.error); if(btn){btn.textContent="Log in with ChatGPT";btn.disabled=false;} return; }
+    if (d.error) { alert("ログインエラー: " + d.error); if(btn){btn.textContent="ChatGPT でログイン";btn.disabled=false;} return; }
     if (d.authUrl) window.open(d.authUrl, "_blank");
     if (d.loginId) {
-      if (btn) btn.textContent = "Waiting for login…";
+      if (btn) btn.textContent = "ログイン待機中…";
       const w = await fetch("/api/login/wait?loginId=" + encodeURIComponent(d.loginId));
       const wr = await w.json();
-      if (!wr.success) alert("Login failed: " + (wr.error || "unknown"));
+      if (!wr.success) alert("ログインに失敗しました: " + (wr.error || "不明なエラー"));
     }
-  } catch (e) { alert("Login error: " + e); }
+  } catch (e) { alert("ログインエラー: " + e); }
   await refreshStatus();
 }
 
@@ -290,7 +290,7 @@ async function loadThreads() {
     (d.threads || []).forEach(t => {
       const el = document.createElement("div");
       el.className = "thread" + (t.id === threadId ? " active" : "");
-      const title = document.createElement("span"); title.className = "t-title"; title.textContent = t.title || "Untitled";
+      const title = document.createElement("span"); title.className = "t-title"; title.textContent = t.title || "無題";
       el.appendChild(title);
       if (t.updatedAt) { const s = document.createElement("small"); s.textContent = new Date(t.updatedAt*1000).toLocaleString(); el.appendChild(s); }
       el.onclick = () => openThread(t.id);
@@ -344,7 +344,7 @@ async function send() {
     }
     await readSSE(resp.body);
   } catch (e) {
-    if (e.name !== "AbortError") { ensureAssistant()._body.textContent += "\n[error] " + e.message; }
+    if (e.name !== "AbortError") { ensureAssistant()._body.textContent += "\n[エラー] " + e.message; }
   } finally {
     streaming = false; setStreaming(false); abortCtl = null;
     loadThreads();
@@ -381,7 +381,7 @@ function handleEvent(ev, d) {
   } else if (ev === "tool_end") { toolCard(d, false);
   } else if (ev === "message") { setAssistant(d.text);
   } else if (ev === "done") { cur = null;
-  } else if (ev === "error") { ensureAssistant()._body.textContent += "\n[error] " + (d.message||""); cur = null; }
+  } else if (ev === "error") { ensureAssistant()._body.textContent += "\n[エラー] " + (d.message||""); cur = null; }
 }
 
 async function stop() {

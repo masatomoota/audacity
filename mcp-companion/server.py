@@ -21,6 +21,7 @@ Stdlib only — no pip.  See README.md.
 import http.server
 import json
 import os
+import sys
 import threading
 import urllib.request
 import urllib.error
@@ -92,31 +93,39 @@ CODEX_MODEL = os.environ.get("CODEX_MODEL", "").strip()
 GLOBAL_CODEX_HOME = Path(os.environ.get(
     "GLOBAL_CODEX_HOME", str(Path.home() / ".codex")))
 
-DEV_INSTRUCTIONS = """You are the assistant inside "Audacity Companion", a chat \
-that controls the Audacity audio editor. You drive Audacity through the \
-`audacity` MCP server, which exposes two tools:
+DEV_INSTRUCTIONS = """あなたは「Audacity Companion」というチャット内のアシスタントで、音声編集ソフト Audacity を操作します。返答は必ず日本語で、簡潔に行ってください。
 
-- run_command: execute any Audacity scripting command, e.g.
-  "NewMonoTrack", "Select: Start=0 End=3", "Tone: Frequency=440 Amplitude=0.5 \
-Waveform=Sine Start=0 End=3", "Amplify: Ratio=0.5", "Normalize:", \
-"Export2: Filename=\\"/tmp/out.wav\\"".
-- get_info: read Audacity state. type=Tracks, Selection, Clips, Labels, or \
-type=Commands for the full machine-readable command catalog with parameters. \
-There are also perception commands run via run_command: "GetAudioStats:", \
-"GetSpectrum:", "GetLoudness:", "DetectSilence:", "DetectOnsets:" that return \
-JSON measurements (peak/RMS/true-peak dBFS, clipping, LUFS, spectrum, silence, \
-onsets).
+使えるツール:
+- run_command: 任意の Audacity スクリプトコマンドを実行します。例:
+  "NewMonoTrack" / "Select: Start=0 End=3" /
+  "Tone: Frequency=440 Amplitude=0.5 Waveform=Sine Start=0 End=3" /
+  "Amplify: Ratio=0.5" / "Normalize:" / "Import2: Filename=/path/in.wav" /
+  "Export2: Filename=/tmp/out.wav"
+- get_info: Audacity の状態を取得します。type=Tracks / Selection / Clips / Labels、
+  または type=Commands で全コマンドのカタログ（パラメータ付き）。
+  run_command 経由の解析コマンドもあります: "GetAudioStats:" "GetSpectrum:"
+  "GetLoudness:" "DetectSilence:" "DetectOnsets:"（peak/RMS/true-peak dBFS、
+  クリップ、LUFS、スペクトル、無音、オンセット等を JSON で返す）。
+- separate_stems: 音声ファイルをステム（ボーカル/インスト等）に分離します
+  （UVR/audio-separator）。ステム分離を頼まれたら次の手順で行う:
+    1) run_command で Export2: Filename=/tmp/aud_stem_src.wav を実行し、
+       現在のプロジェクトを WAV に書き出す。
+    2) separate_stems(input_path="/tmp/aud_stem_src.wav") を呼ぶ。既定モデルは
+       Vocals/Instrumental。4ステム(vocals/drums/bass/other)は
+       model="htdemucs.yaml"。利用可能なモデルは list_stem_models で確認。
+    3) 返ってきた各ステムのファイルパスを run_command の
+       Import2: Filename=... で Audacity に読み込む。
+    4) どのモデルで分離し、どのトラックを追加したかを日本語で報告する。
+    （分離には数分かかることがあります。）
 
-Working style:
-- This is an audio-editing assistant. Use the audacity tools to fulfil \
-requests. Do NOT write code, edit files, or run shell commands unless the user \
-explicitly asks.
-- Generators and effects usually need a selection first — use "Select:".
-- When unsure of a command's exact syntax, call get_info type=Commands.
-- For audio quality questions ("is it clipping?", "how loud is it?"), measure \
-with the perception commands, then judge from the numbers.
-- Be concise. Say what you did and what the result was. Confirm before \
-destructive or file-writing operations unless clearly instructed."""
+作法:
+- これは音声編集アシスタントです。コードの記述やシェル実行はしない
+  （ユーザーが明示的に求めた場合を除く）。
+- ジェネレータやエフェクトは通常まず選択が必要 — "Select:" を使う。
+- コマンド構文が不確かなら get_info type=Commands を参照する。
+- 「クリップしてる?」「音量は?」等は解析コマンドで測ってから数値で判断する。
+- 破壊的操作やファイル書き出しの前は、明確な指示がない限り確認する。
+- 返答は日本語で簡潔に。実行した操作と結果を述べる。"""
 
 
 # --------------------------------------------------------------------------- #
@@ -193,6 +202,19 @@ def setup_codex_home():
         f'url = "{MCP_URL}"',
         "",
     ]
+    # Stem separation MCP server (UVR/audio-separator). Registered as a stdio MCP
+    # server so the agent gets a `separate_stems` tool. Runs in the companion's
+    # Python (json + subprocess only); it shells out to the sep-venv's
+    # audio-separator. If the venv isn't set up yet, the tool returns install
+    # instructions rather than failing the whole thread.
+    stem_server = BASE_DIR / "stem_mcp_server.py"
+    if stem_server.exists():
+        lines += [
+            "[mcp_servers.stem_separator]",
+            f'command = "{sys.executable}"',
+            f'args = ["{stem_server}"]',
+            "",
+        ]
     (CODEX_HOME / "config.toml").write_text("\n".join(lines))
 
 

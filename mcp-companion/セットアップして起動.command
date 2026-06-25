@@ -93,13 +93,24 @@ say "Codex CLI: $CODEX_BIN"
 export CODEX_BIN
 
 # --- 4. companion 起動 ------------------------------------------------------
+# 専用ウィンドウで開く: Chrome の --app モード（タブ・アドレスバー無しの単独
+# ウィンドウ）。Chrome が無ければ既定ブラウザにフォールバック。
+URL="http://127.0.0.1:${PORT}"
+open_window() {
+  local chrome="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+  if [ -x "$chrome" ]; then
+    "$chrome" --app="$1" --new-window >/dev/null 2>&1 &
+  else
+    open "$1" >/dev/null 2>&1
+  fi
+}
 say ""
-say "AI チャットを起動します → ブラウザで http://127.0.0.1:${PORT} を開きます。"
+say "AI チャットを専用ウィンドウで開きます（$URL）。"
 say "・Audacity 側で『ようこそ』画面が出たら閉じてください。初回はプラグイン"
-say "  スキャン中チャットの接続表示が赤、完了すると緑になります。"
-say "・チャット右上の『Log in with ChatGPT』でサインイン（API キー不要）。"
+say "  スキャン中はチャットの接続表示が赤、完了すると緑になります。"
+say "・チャット右上の『ChatGPT でログイン』でサインイン（API キー不要）。"
 say "・停止するにはこのウィンドウで Ctrl+C。"
 say ""
-( sleep 2; open "http://127.0.0.1:${PORT}" >/dev/null 2>&1 ) &
+( sleep 2; open_window "$URL" ) &
 python3 server.py
 pause
