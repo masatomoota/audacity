@@ -298,11 +298,16 @@ bool TrackArt::DrawClipTitle(
       return false;
    const auto titleRect =
       GetClipTruncatedTitleRect(dc, affordanceRect, truncatedTitle);
-   const auto alignLeft =
-      wxTheApp->GetLayoutDirection() == wxLayout_LeftToRight;
-   dc.DrawLabel(
-      truncatedTitle, titleRect,
-      (alignLeft ? wxALIGN_LEFT : wxALIGN_RIGHT) | wxALIGN_CENTER_VERTICAL);
+   // Optically center the clip title vertically in the affordance bar: center
+   // the ascent (the inked region) rather than the full em box, so the empty
+   // descent does not push the text up and make it look top-aligned (matches
+   // CommonTrackInfo::CloseTitleDrawFunction).  titleRect is already positioned
+   // and sized to the (left/right-aligned) text, so a plain DrawText at its
+   // left reproduces the previous horizontal alignment.
+   const auto metrics = dc.GetFontMetrics();
+   dc.DrawText(
+      truncatedTitle, titleRect.GetLeft(),
+      titleRect.GetTop() + (titleRect.GetHeight() - metrics.ascent) / 2);
    return true;
 }
 
