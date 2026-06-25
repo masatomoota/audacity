@@ -79,9 +79,11 @@ COMPANION_PORT = int(os.environ.get("COMPANION_PORT", "8765"))
 MCP_URL = os.environ.get("MCP_URL", "http://127.0.0.1:4830/mcp")
 
 # Isolated Codex home so the companion only sees the Audacity MCP server and
-# keeps its own threads/auth separate from the user's global Codex.
+# keeps its own threads/auth separate from the user's global Codex.  Defaults to
+# a writable per-user location (NOT next to the scripts) so the companion runs
+# correctly even when launched from a read-only location such as a mounted DMG.
 CODEX_HOME = Path(os.environ.get(
-    "CODEX_HOME_COMPANION", str(BASE_DIR / ".codex"))).resolve()
+    "CODEX_HOME_COMPANION", str(Path.home() / ".audacity-mcp-companion"))).resolve()
 CODEX_WORKDIR = Path(os.environ.get(
     "CODEX_WORKDIR", str(CODEX_HOME / "workdir"))).resolve()
 CODEX_BIN = os.environ.get("CODEX_BIN", "codex")
