@@ -70,14 +70,37 @@ for f in server.py codex_bridge.py index.html run.sh README.md "セットアッ�
 done
 chmod +x "$DEST/セットアップして起動.command" "$DEST/run.sh"
 
+# 3b. One-click launcher at the DMG root that starts BOTH Audacity and the chat
+# (it just delegates to the companion launcher, which now launches Audacity too).
+LAUNCHER="$STAGE/Audacity と AI チャットを起動.command"
+cat > "$LAUNCHER" <<'LAUNCH'
+#!/bin/bash
+# Audacity（MCP サーバ内蔵）と AI チャット(MCP Companion) を一緒に起動します。
+exec "$(dirname "$0")/MCP Companion/セットアップして起動.command"
+LAUNCH
+chmod +x "$LAUNCHER"
+
 # 4. Top-level read-me (Japanese)
 cat > "$STAGE/はじめにお読みください.txt" <<'TXT'
 Audacity MCP — 同梱物と使い方
 ================================================================
 
-このディスクには 2 つが入っています。
-  • Audacity.app           … MCP サーバ内蔵の Audacity（このフォーク）
-  • MCP Companion フォルダ  … 言葉で Audacity を操作するチャット（Codex 版）
+このディスクには次が入っています。
+  • Audacity.app                         … MCP サーバ内蔵の Audacity（このフォーク）
+  • MCP Companion フォルダ                … 言葉で Audacity を操作するチャット（Codex 版）
+  • 「Audacity と AI チャットを起動.command」… 両方をまとめて起動（おすすめ）
+
+================================================================
+かんたん起動（おすすめ）
+================================================================
+  ・先に Audacity.app を Applications にドラッグし、初回だけ下のコマンドで
+    Gatekeeper を解除しておきます:
+        xattr -dr com.apple.quarantine /Applications/Audacity.app
+  ・あとは「Audacity と AI チャットを起動.command」を右クリック →「開く」。
+    Audacity と AI チャットが一緒に立ち上がります（初回は Codex CLI を自動
+    取得・約 249MB／ブラウザの「Log in with ChatGPT」でサインイン）。
+
+  以下は個別の手順です。
 
 ----------------------------------------------------------------
 1. Audacity をインストール

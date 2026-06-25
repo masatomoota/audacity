@@ -1,19 +1,17 @@
 #!/bin/bash
 # =============================================================================
-# Audacity MCP Companion — セットアップ & 起動（Codex app-server 版）
+# Audacity ＋ AI チャット（MCP Companion）を一緒に起動（Codex app-server 版）
 #
-# ダブルクリックで実行します。初回は必要なら Codex CLI を自動取得し、
-# ブラウザのチャット UI から ChatGPT でログインして使い始められます。
+# ダブルクリックすると、Audacity（MCP サーバ内蔵）と AI チャットの両方を
+# 立ち上げます。
 #
 #   1. Python 3 を確認（無ければ開発者ツールの導入を案内）
-#   2. Codex CLI を解決（PATH / Codex.app / キャッシュ）— 無ければ公式の
+#   2. Audacity を起動（未起動なら）— DMG 内 / Applications / dev ビルドから自動検出
+#   3. Codex CLI を解決（PATH / Codex.app / キャッシュ）— 無ければ公式の
 #      署名済みバイナリを ~/.audacity-mcp-companion/bin に自動ダウンロード
-#   3. Audacity（mod-mcp-server 入り）が起動していなければ起動を試みる
 #   4. companion サーバを起動し、ブラウザで http://127.0.0.1:8765 を開く
 #
-# 別途インストール不要にしたい場合は、Codex CLI をあらかじめ
-#   brew install --cask codex
-# で入れておくこともできます（その場合 2. のダウンロードは省略）。
+# Codex CLI を手動で入れる場合: brew install --cask codex
 # =============================================================================
 
 cd "$(dirname "$0")" || exit 1
@@ -24,25 +22,48 @@ BIN_DIR="$SUPPORT/bin"
 MCP_URL="${MCP_URL:-http://127.0.0.1:4830/mcp}"
 PORT="${COMPANION_PORT:-8765}"
 
-say()   { printf '%s\n' "$*"; }
-pause() { echo; read -r -n 1 -s -p "Enter キーで閉じます… "; echo; }
-fail()  { say ""; say "✖ $*"; pause; exit 1; }
+say()    { printf '%s\n' "$*"; }
+pause()  { echo; read -r -n 1 -s -p "Enter キーで閉じます… "; echo; }
+fail()   { say ""; say "✖ $*"; pause; exit 1; }
+mcp_up() { curl -fsS --max-time 2 -X POST "$MCP_URL" \
+             -d '{"jsonrpc":"2.0","id":1,"method":"ping"}' >/dev/null 2>&1; }
 
-say "=== Audacity MCP Companion セットアップ ==="
+say "=== Audacity ＋ AI チャットを起動 ==="
 
 # --- 0. アーキテクチャ ------------------------------------------------------
-if [ "$(uname -m)" != "arm64" ]; then
+[ "$(uname -m)" = "arm64" ] || \
   fail "このビルドは Apple Silicon (arm64) 専用です（現在: $(uname -m)）。"
-fi
 
 # --- 1. Python 3 ------------------------------------------------------------
 if ! command -v python3 >/dev/null 2>&1; then
   say "Python 3 が見つかりません。コマンドラインデベロッパツールを導入します…"
   xcode-select --install 2>/dev/null || true
-  fail "導入完了後、もう一度この『セットアップして起動』を実行してください。"
+  fail "導入完了後、もう一度この起動ファイルを実行してください。"
 fi
 
-# --- 2. Codex CLI -----------------------------------------------------------
+# --- 2. Audacity を起動（先に立ち上げてプラグインスキャンを並行させる）-----
+if mcp_up; then
+  say "Audacity は既に起動しています。"
+else
+  AUD=""
+  for cand in \
+    "../Audacity.app" \                          # DMG: 「MCP Companion」の隣
+    "/Applications/Audacity.app" \               # インストール済み
+    "$HOME/Applications/Audacity.app" \
+    "../build/RelWithDebInfo/Audacity.app"; do   # 開発リポジトリ
+    if [ -d "$cand" ]; then AUD="$cand"; break; fi
+  done
+  if [ -n "$AUD" ]; then
+    say "Audacity を起動します: $AUD"
+    open "$AUD" 2>/dev/null || open -a "Audacity" 2>/dev/null \
+      || say "  起動に失敗しました。手動で Audacity を開いてください。"
+  else
+    open -a "Audacity" 2>/dev/null \
+      || say "  Audacity.app が見つかりません。Applications に入れて開いてください。"
+  fi
+fi
+
+# --- 3. Codex CLI -----------------------------------------------------------
 CODEX_BIN=""
 for c in "${CODEX_BIN:-}" "$BIN_DIR/codex" \
          "/Applications/Codex.app/Contents/Resources/codex" \
@@ -71,19 +92,13 @@ fi
 say "Codex CLI: $CODEX_BIN"
 export CODEX_BIN
 
-# --- 3. Audacity（MCP サーバ）を確認・起動 ---------------------------------
-if ! curl -fsS --max-time 2 -X POST "$MCP_URL" \
-        -d '{"jsonrpc":"2.0","id":1,"method":"ping"}' >/dev/null 2>&1; then
-  say "Audacity の MCP サーバ ($MCP_URL) に接続できません。Audacity を起動します…"
-  open -a "Audacity" >/dev/null 2>&1 \
-    || say "  （Audacity.app を Applications に入れて手動で起動してください）"
-fi
-
 # --- 4. companion 起動 ------------------------------------------------------
 say ""
-say "companion を起動します。ブラウザで http://127.0.0.1:${PORT} を開きます。"
-say "初回はチャット画面右上の『Log in with ChatGPT』でサインインしてください。"
-say "停止するにはこのウィンドウで Ctrl+C を押します。"
+say "AI チャットを起動します → ブラウザで http://127.0.0.1:${PORT} を開きます。"
+say "・Audacity 側で『ようこそ』画面が出たら閉じてください。初回はプラグイン"
+say "  スキャン中チャットの接続表示が赤、完了すると緑になります。"
+say "・チャット右上の『Log in with ChatGPT』でサインイン（API キー不要）。"
+say "・停止するにはこのウィンドウで Ctrl+C。"
 say ""
 ( sleep 2; open "http://127.0.0.1:${PORT}" >/dev/null 2>&1 ) &
 python3 server.py
