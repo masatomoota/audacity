@@ -18,11 +18,10 @@
 
 | 場所 | ブランチ | 内容 |
 |---|---|---|
-| `/Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-3x` (**作業 worktree**) | `mcp-llm`（`origin/audacity3` 起点, HEAD `2cbd4c41c`） | **本 Phase 0 実装の本体**。新モジュール＋両ハンドオフ。 |
-| `/Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity` (元 checkout) | `mcp-llm-handoff`（4.0-alpha `7ad9b3818`） | 当初の計画ハンドオフのみ（4.0 ツリー上）。 |
-| build dir（out-of-tree） | — | `/Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-3x-build`（worktree を汚さない） |
+| `/Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-mcp` (**作業リポ**) | `mcp-llm`（`origin/audacity3` 起点で派生） | **本実装の本体**（fork の `mcp-llm` ブランチを fresh clone した独立リポ）。新モジュール＋ハンドオフ＋コンパニオン＋知覚コマンド全部入り。 |
+| build dir（out-of-tree） | — | `/Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-mcp/build`（リポを汚さない、`.gitignore` で除外） |
 
-- worktree は `git worktree add -b mcp-llm ../audacity-3x origin/audacity3` で作成。
+- 当初は `git worktree add -b mcp-llm ../audacity-3x origin/audacity3` で worktree として開始したが、その後 fork (`github.com/masatomoota/audacity`) に全成果物を push してから **fresh clone に統合**（旧 `audacity/`・`audacity-3x/`・`audacity-3x-build/` は削除済み）。
 - **git remotes**: `origin` = `github.com/audacity/audacity`（公式・push しない）、`fork` = `github.com/masatomoota/audacity`（**同期先**）。
 - `mcp-llm` は `audacity3` 起点のクリーンな feature ブランチ（差分＝新 dir ＋ CMake 1 行）＝安全にマージ可能。
 
@@ -38,18 +37,18 @@
 ```bash
 export PATH="/Users/masatomo/Library/Python/3.9/bin:/opt/homebrew/bin:$PATH"
 cmake -G Ninja \
-  -S /Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-3x \
-  -B /Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-3x-build \
+  -S /Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-mcp \
+  -B /Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-mcp/build \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-cmake --build /Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-3x-build -j
+cmake --build /Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-mcp/build -j
 ```
 
 ### 3.3 ツールチェーン・ワークアラウンド（重要）
 - **`-DCMAKE_POLICY_VERSION_MINIMUM=3.5`** が必須。CMake 4.x は `cmake_minimum_required(VERSION <3.5)` を拒否するため（VST3 SDK 等の vendored cmake が該当）。
 - **`-Werror` は不要**。プロジェクトは警告をエラー化しない。ソース改変ゼロで vanilla がビルド可能。
 - 初回 configure は Conan が全 27 依存を **source ビルド**（apple-clang 17 のプリビルドが無い）で約 9 分、compile 約 25–30 分。2 回目以降は Conan キャッシュで高速。
-- 成果物: `…/audacity-3x-build/RelWithDebInfo/Audacity.app`（arm64, 約 17MB バイナリ）。
+- 成果物: `…/audacity-mcp/build/RelWithDebInfo/Audacity.app`（arm64, 約 17MB バイナリ）。
 
 ---
 
@@ -102,7 +101,7 @@ if (auto pProject = ::GetActiveProject().lock()) {     // ← アクティブ pr
 
 ユーザーの実プロファイルを汚さない隔離は **Portable Settings**（`libraries/lib-files/FileNames.cpp:287-303`）: `Audacity.app/Contents/Portable Settings/audacity.cfg` を置けばそこが config dir になる。検証で使った確実な手法 = `.so` の mtime を固定値に `touch` し、cfg に同値を書く：
 ```bash
-APP=…/audacity-3x-build/RelWithDebInfo/Audacity.app
+APP=…/audacity-mcp/build/RelWithDebInfo/Audacity.app
 MODSO="$APP/Contents/modules/mod-mcp-server.so"
 touch -t 202606251200.00 "$MODSO"
 mkdir -p "$APP/Contents/Portable Settings"
@@ -263,8 +262,8 @@ LLM が音を**数値で判断**できるよう、コア `src/commands/GetAudioS
 - 検証は私が curl で MCP を直叩きすればよい（接続先 `http://127.0.0.1:4830/mcp`）。
 
 ### 11.4 リポ/ブランチ状態
-- 作業 worktree: `/Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-3x`（ブランチ `mcp-llm`）。
-- ビルド出力: `/Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-3x-build/RelWithDebInfo/Audacity.app`。
+- 作業リポ: `/Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-mcp`（fork の `mcp-llm` ブランチを fresh clone した独立リポ）。
+- ビルド出力: `/Volumes/work-ssd-4TB-USB4/_Git_Repository/audacity-mcp/build/RelWithDebInfo/Audacity.app`（`.gitignore` 済み）。
 - アプリは bundle 内 `Contents/Portable Settings/audacity.cfg` で `mod-mcp-server=1` 有効化済み（autoEnabledModules() に登録済み）。次の LLM はビルド後に普通に `open Audacity.app` するだけで MCP サーバが 4830 に立つ。
 - 同期先 fork: `github.com/masatomoota/audacity`、ブランチ `mcp-llm`。**公式 `origin`（`github.com/audacity/audacity`）には絶対に push しない**。
 
