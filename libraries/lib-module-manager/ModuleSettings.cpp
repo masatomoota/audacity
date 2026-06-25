@@ -87,6 +87,9 @@ static const std::unordered_set<wxString> &autoEnabledModules()
       "mod-cloud-audiocom",
       "mod-musehub-ui",
       "mod-openvino",
+      // Fork addition: the MCP/LLM control surface is enabled by default so the
+      // localhost MCP server (and the in-app assistant) work out of the box.
+      "mod-mcp-server",
    };
    return modules;
 }
