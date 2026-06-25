@@ -7,6 +7,15 @@
 #
 # Output: build/Audacity-MCP.dmg
 #
+# This packages an AU-only / GPLv2 build. Configure Audacity beforehand with VST
+# disabled so no VST3 SDK (GPLv3) ships:
+#   cmake -G Ninja -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+#     -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+#     -Daudacity_has_vst3=Off -Daudacity_use_vst=Off -Daudacity_bundle_gplv3=Off
+#   cmake --build build -j
+# (Audio Unit support stays ON by default on macOS; it uses only the system
+# AudioUnit framework, no third-party SDK.)
+#
 # Note: there is no Apple Developer ID on this machine, so the result is NOT
 # notarized. Recipients must clear Gatekeeper quarantine on first launch
 # (right-click -> Open, or `xattr -dr com.apple.quarantine`). See the in-DMG
@@ -37,6 +46,11 @@ ditto "$APP" "$STAGE/Audacity.app"
 # mod-mcp-server is auto-enabled in code (autoEnabledModules()), so the MCP
 # server still starts on a fresh per-user profile.
 rm -rf "$STAGE/Audacity.app/Contents/Portable Settings"
+
+# 1a-2. AU-only build (configured with -Daudacity_has_vst3=Off -Daudacity_use_vst=Off):
+# remove any stale VST host dylibs an incremental build may have left behind, so
+# no VST3 SDK (GPLv3) code ships. The app binary does not link these.
+rm -f "$STAGE/Audacity.app/Contents/Frameworks/"lib-vst*.dylib
 
 # NOTE: do NOT `codesign --force --deep` the bundle. It produces a "valid"
 # signature but re-signs the bundled plugin-scanner helper inconsistently, which
@@ -102,7 +116,20 @@ Audacity MCP — 同梱物と使い方
     場合のみ、上記の方法で開いてください。
   • "Audacity" は Muse Group の登録商標です。広く再配布する場合は名称・
     アイコンのリブランドが必要です。
+  • プラグイン対応: AU（Audio Unit）のみ。VST/VST3 は無効化しています。
+    VST3 SDK（GPLv3）を含まないため、本ビルドは GPLv2-or-later で配布可能です
+    （同梱「LICENSE (GPLv2).txt」）。GPL の義務に基づきソースは元リポジトリで
+    提供されます。
 TXT
+
+# 4b. GPLv2 license text (AU-only build excludes the VST3 SDK → no GPLv3-only
+# components → distributable under GPLv2-or-later).
+GPLV2="$REPO/build/LICENSE-GPLv2.txt"
+if [ ! -s "$GPLV2" ]; then
+  curl -fsSL https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt -o "$GPLV2" \
+    || echo "WARNING: could not fetch GPLv2 license text"
+fi
+[ -s "$GPLV2" ] && cp "$GPLV2" "$STAGE/LICENSE (GPLv2).txt"
 
 # 5. Build the compressed DMG
 echo "Creating $DMG …"
