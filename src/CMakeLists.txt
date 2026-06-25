@@ -267,6 +267,8 @@ set( SOURCES
       commands/CommandType.h
       commands/CompareAudioCommand.cpp
       commands/CompareAudioCommand.h
+      commands/GetAudioStatsCommand.cpp
+      commands/GetAudioStatsCommand.h
       commands/Demo.cpp
       commands/Demo.h
       commands/DragCommand.cpp

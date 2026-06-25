@@ -191,4 +191,21 @@ tools/call 形式: `{"jsonrpc":"2.0","id":N,"method":"tools/call","params":{"nam
 
 ---
 
-*End of Phase 0 implementation handoff. 次の LLM へ：§5 の手順でビルド→有効化→検証を再現でき、§7 の Phase 1（`get_info`→`tools/list` 自動生成）から続行できる。アプリ内チャットは §9 のコンパニオン方式で完成済み。*
+---
+
+## 10. Phase 2 知覚（着手済み）: `GetAudioStats`
+
+LLM が音を**数値で判断**できるよう、コア `src/commands/GetAudioStatsCommand.{h,cpp}` を追加（`CompareAudioCommand` をひな形、`BuiltinCommandsModule::Registration<>` で自己登録、`Extra > Scriptables II` にメニューも）。`src/CMakeLists.txt` に2ファイル追加（commands リストは glob でなく明示列挙）。**コア側なので mod-ai-assistant のようなロード破壊リスクは無い**（既存コマンドと同じ確立パターン）。
+
+`run_command "GetAudioStats:"` で、**選択範囲の各 wave トラック/チャンネル**について JSON 配列を返す:
+- `peak_linear`/`peak_dbfs`, `rms_linear`/`rms_dbfs`, `clip_count`(|v|≥1.0 のサンプル数), `dc_offset`, `n_samples`, `sample_rate`, `start`/`end`, `name`, `track_index`/`channel_index`/`n_channels`。
+- パラメータ `UseSelection`(bool, 既定 true; false で全トラック範囲)。
+- 全指標を**1回のサンプルブロックループ**で計算（`WaveChannelUtilities::GetMinMax/GetRMS` 等の不確実 API に非依存）。出力は `context.StartArray/StartStruct/AddItem(double,name)/EndStruct/EndArray`（GetInfo と同じ機構＝MCP 応答に乗る）。
+
+**検証済み**: 440Hz/0.8 サイン → `peak 0.8/-1.94dBFS, rms 0.566/-4.95dBFS, clip 0, DC≈0`（理論値一致）。クリップ誘発（Amplify 1.3）→ `peak +1.36dBFS, clip_count 30640` を検出 → Amplify 0.5 で `-4.66dBFS, clip 0` に修正、を「**測る→判断→直す→再測定**」の閉ループで実証。これで LLM はクリップ/音量過不足/無音/DC を判断し補正できる。
+
+**次の知覚拡張候補**: `GetSpectrum`（FFT ビン → 帯域バランス/ハム(50/60Hz)/支配周波数）, `DetectSilence`/`DetectOnsets`, ラウドネス(LUFS)。**留意**: 必ず「集約された派生指標」を返すこと（生サンプル列は LLM が扱えない）。
+
+---
+
+*End of Phase 0 implementation handoff. 次の LLM へ：§5 の手順でビルド→有効化→検証を再現でき、§7 の Phase 1（`get_info`→`tools/list` 自動生成）から続行できる。アプリ内チャットは §9 のコンパニオン方式で完成済み。Phase 2 知覚は §10 の `GetAudioStats` を起点に拡張できる。*
