@@ -51,9 +51,15 @@ void BackedPanel::ResizeBacking()
       mBackingDC.SelectObject(wxNullBitmap);
 
    wxSize sz = GetClientSize();
+   const double scale = GetContentScaleFactor();
    mBacking = std::make_unique<wxBitmap>();
    // Bug 2040 - Avoid 0 x 0 bitmap when minimized.
-   mBacking->Create(std::max(sz.x,1), std::max(sz.y,1),24); //, *dc);
+   // Create the backing store at physical (device) resolution by tagging it
+   // with the window's content scale factor.  Otherwise the whole TrackPanel
+   // is drawn into a 1x bitmap and then stretched to the Retina backing store,
+   // which makes text (track names, clip titles) blurry on HiDPI displays.
+   // This mirrors how wxBufferedDC builds its own back-buffer (dcbufcmn.cpp).
+   mBacking->CreateScaled(std::max(sz.x,1), std::max(sz.y,1), 24, scale);
    mBackingDC.SelectObject(*mBacking);
 }
 
@@ -64,8 +70,14 @@ void BackedPanel::RepairBitmap(wxDC &dc, wxCoord x, wxCoord y, wxCoord width, wx
 
 void BackedPanel::DisplayBitmap(wxDC &dc)
 {
-   if( mBacking ) 
-      RepairBitmap(dc, 0, 0, mBacking->GetWidth(), mBacking->GetHeight());
+   if( mBacking )
+   {
+      // The backing bitmap is stored at physical resolution (see
+      // ResizeBacking), so blit using its logical size; the copy then maps 1:1
+      // onto the equally-scaled target DC.
+      const wxSize logical = mBacking->GetScaledSize();
+      RepairBitmap(dc, 0, 0, logical.GetWidth(), logical.GetHeight());
+   }
 }
 
 void BackedPanel::OnSize(wxSizeEvent & event)

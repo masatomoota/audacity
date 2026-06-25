@@ -734,11 +734,11 @@ static BuiltinFormatString TimeConverterFormats_[] =  {
    {
    NumericConverterFormats::HoursMinsSecondsFormat(),
    /* i18n-hint: Format string for displaying time in hours, minutes and
-    * seconds. Change the 'h' to the abbreviation for hours, 'm' to the
-    * abbreviation for minutes and 's' to the abbreviation for seconds. Don't
-    * change the numbers unless there aren't 60 seconds in a minute in your
-    * locale */
-   XO("0100 h 060 m 060 s")
+    * seconds, DAW-style with colon separators (hh:mm:ss). The ':' separators
+    * are punctuation and are deliberately NOT translated, so the readout looks
+    * the same in every language. Don't change the numbers unless there aren't
+    * 60 seconds in a minute in your locale. */
+   XO("0100:060:060")
    },
 
    {
@@ -746,11 +746,10 @@ static BuiltinFormatString TimeConverterFormats_[] =  {
     * minutes and seconds */
    { XO("dd:hh:mm:ss") },
    /* i18n-hint: Format string for displaying time in days, hours, minutes and
-    * seconds. Change the 'days' to the word for days, 'h' to the abbreviation
-    * for hours, 'm' to the abbreviation for minutes and 's' to the
-    * abbreviation for seconds. Don't change the numbers unless there aren't
-    * 24 hours in a day in your locale */
-   XO("0100 days 024 h 060 m 060 s")
+    * seconds, DAW-style with colon separators (dd:hh:mm:ss). The ':' separators
+    * are punctuation and are deliberately NOT translated. Don't change the
+    * numbers unless there aren't 24 hours in a day in your locale */
+   XO("0100:024:060:060")
    },
 
    {
@@ -760,9 +759,10 @@ static BuiltinFormatString TimeConverterFormats_[] =  {
     * 'm' to the abbreviation for minutes and 's' to the abbreviation for seconds
     * (the hundredths are shown as decimal seconds). Don't change the numbers
     * unless there aren't 60 minutes in an hour in your locale.
-    * The decimal separator is specified using '<' if your language uses a ',' or
-    * to '>' if your language uses a '.'. */
-     { XO("0100 h 060 m 060>0100 s"),
+    * DAW-style colon separators (hh:mm:ss.cc); ':' is punctuation, NOT
+    * translated. The decimal separator is specified using '<' if your language
+    * uses a ',' or '>' if your language uses a '.'. */
+     { XO("0100:060:060>0100"),
        XO("centiseconds") }
    },
 
@@ -773,9 +773,10 @@ static BuiltinFormatString TimeConverterFormats_[] =  {
     * abbreviation for minutes and 's' to the abbreviation for seconds (the
     * milliseconds are shown as decimal seconds) . Don't change the numbers
     * unless there aren't 60 minutes in an hour in your locale.
-    * The decimal separator is specified using '<' if your language uses a ',' or
-    * to '>' if your language uses a '.'. */
-     { XO("0100 h 060 m 060>01000 s"),
+    * DAW-style colon separators (hh:mm:ss.mmm); ':' is punctuation, NOT
+    * translated. The decimal separator is specified using '<' if your language
+    * uses a ',' or '>' if your language uses a '.'. */
+     { XO("0100:060:060>01000"),
        XO("milliseconds") }
    },
 
