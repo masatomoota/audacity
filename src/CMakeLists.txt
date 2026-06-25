@@ -269,6 +269,14 @@ set( SOURCES
       commands/CompareAudioCommand.h
       commands/GetAudioStatsCommand.cpp
       commands/GetAudioStatsCommand.h
+      commands/GetSpectrumCommand.cpp
+      commands/GetSpectrumCommand.h
+      commands/DetectSilenceCommand.cpp
+      commands/DetectSilenceCommand.h
+      commands/DetectOnsetsCommand.cpp
+      commands/DetectOnsetsCommand.h
+      commands/GetLoudnessCommand.cpp
+      commands/GetLoudnessCommand.h
       commands/Demo.cpp
       commands/Demo.h
       commands/DragCommand.cpp

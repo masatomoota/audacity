@@ -204,7 +204,13 @@ LLM が音を**数値で判断**できるよう、コア `src/commands/GetAudioS
 
 **検証済み**: 440Hz/0.8 サイン → `peak 0.8/-1.94dBFS, rms 0.566/-4.95dBFS, clip 0, DC≈0`（理論値一致）。クリップ誘発（Amplify 1.3）→ `peak +1.36dBFS, clip_count 30640` を検出 → Amplify 0.5 で `-4.66dBFS, clip 0` に修正、を「**測る→判断→直す→再測定**」の閉ループで実証。これで LLM はクリップ/音量過不足/無音/DC を判断し補正できる。
 
-**次の知覚拡張候補**: `GetSpectrum`（FFT ビン → 帯域バランス/ハム(50/60Hz)/支配周波数）, `DetectSilence`/`DetectOnsets`, ラウドネス(LUFS)。**留意**: 必ず「集約された派生指標」を返すこと（生サンプル列は LLM が扱えない）。
+**知覚コマンド一式（実装済み・実機検証済み）**: `GetAudioStats` に加え、同じパターンで `src/commands/` に4種を追加（コア側・既存 lib の再利用、CMake は src/CMakeLists.txt にファイル列挙のみ）:
+- `GetSpectrum:`（params `Bands`=48, `UseSelection`）— `SpectrumAnalyst`(lib-fft) で FFT、~48 の log 帯域 dB ＋ `dominant_freq_hz` ＋ `centroid_hz` を JSON。→ 帯域バランス/ハム(50/60Hz)/支配周波数の判断。検証: 440Hz トーンで dominant≈430.7Hz。
+- `DetectSilence:`（`Threshold` dBFS=-60, `MinDuration` sec=0.5, `UseSelection`）— 窓 RMS で無音区間 `intervals:[{start,end}]` ＋ leading/trailing。検証: 1–2s 無音化 → [1,2] 検出。
+- `DetectOnsets:`（`Threshold` dB=6, `WindowMs`=20, `UseSelection`）— エネルギー立上りでアタック時刻 `onsets:[{time}]`。検証: 無音明け t=2.0 検出。
+- `GetLoudness:`（`UseSelection`）— `EBUR128`(lib-math) で統合ラウドネス `lufs_integrated`。<400ms は `warning="below_gate"`。検証: -10.4 LUFS。
+
+**設計原則**: 全コマンド「集約された派生指標を JSON で返す」（生サンプル列は LLM が扱えない）。`SpectrumAnalyst`(lib-fft)・`EBUR128`(lib-math) は既存実装を再利用。これで LLM はレベル/クリップ/無音/DC/スペクトル/ラウドネス/アタックを数値判断できる。さらなる候補: 真ピーク(true-peak)、短期/瞬時ラウドネス、`CompareAudio` 強化。
 
 ---
 
