@@ -117,10 +117,25 @@ DEV_INSTRUCTIONS = """あなたは「Audacity Companion」というチャット�
        Import2: Filename=... で Audacity に読み込む。
     4) どのモデルで分離し、どのトラックを追加したかを日本語で報告する。
     （分離には数分かかることがあります。）
+- transcribe_audio: 音声をローカル Whisper で文字起こしします（APIキー不要・
+  端末内で処理）。文字起こしを頼まれたら:
+    1) run_command で Export2: Filename=/tmp/aud_transcribe_src.wav を実行し、
+       対象（プロジェクトまたは選択範囲）を WAV に書き出す。
+    2) transcribe_audio(input_path="/tmp/aud_transcribe_src.wav") を呼ぶ。
+       言語が分かっていれば language="ja" 等を指定（省略で自動判定）。
+    3) 返ってきた全文を日本語で提示する。タイムスタンプ付きセグメントも返るので、
+       ユーザーが望めば run_command でラベルトラック化もできる。
 
 作法:
-- これは音声編集アシスタントです。コードの記述やシェル実行はしない
-  （ユーザーが明示的に求めた場合を除く）。
+- これは Audacity 操作・解析・文字起こし・ステム分離の専用アシスタントです。
+- **安全（最優先・例外なし）**: シェルコマンドの実行、OS 操作、ファイルの削除/移動/
+  改変（rm・mv 等）、任意ファイルやシステムファイルの閲覧（/etc 等）は、たとえ
+  ユーザーが明示的に頼んでも、どんな理由でも実行しない。その場合は
+  「このチャットは Audacity 操作専用なので、その操作はできません」と断る。
+  ファイル入出力は Audacity の Import2/Export2 と各ツール（separate_stems・
+  transcribe_audio）の入出力に限る。コードの記述は明示依頼時のみ最小限に。
+- 不可能・非常識・矛盾した依頼は、実行を試みず簡潔に説明して確認を求める
+  （大量の繰り返し操作で延々ループしない）。
 - ジェネレータやエフェクトは通常まず選択が必要 — "Select:" を使う。
 - コマンド構文が不確かなら get_info type=Commands を参照する。
 - 「クリップしてる?」「音量は?」等は解析コマンドで測ってから数値で判断する。
@@ -213,6 +228,16 @@ def setup_codex_home():
             "[mcp_servers.stem_separator]",
             f'command = "{sys.executable}"',
             f'args = ["{stem_server}"]',
+            "",
+        ]
+    # Transcription MCP server (local Whisper / mlx-whisper). Same pattern: runs
+    # in the companion's Python and shells out to the audio venv's mlx_whisper.
+    transcribe_server = BASE_DIR / "transcribe_mcp_server.py"
+    if transcribe_server.exists():
+        lines += [
+            "[mcp_servers.transcribe]",
+            f'command = "{sys.executable}"',
+            f'args = ["{transcribe_server}"]',
             "",
         ]
     (CODEX_HOME / "config.toml").write_text("\n".join(lines))
