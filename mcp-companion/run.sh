@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Audacity MCP Companion — convenience launcher
+# Audacity MCP Companion — convenience launcher (Codex app-server edition)
 
 set -euo pipefail
 
@@ -21,48 +21,42 @@ if [ "$PY_VER" -lt 37 ]; then
   exit 1
 fi
 
-# ── Check API key ────────────────────────────────────────────────────────────
-PROVIDER="${AI_PROVIDER:-anthropic}"
+# ── Check Codex CLI ─────────────────────────────────────────────────────────
+CODEX_BIN="${CODEX_BIN:-codex}"
+if ! command -v "$CODEX_BIN" &>/dev/null; then
+  echo "ERROR: '$CODEX_BIN' (Codex CLI) not found in PATH."
+  echo "  Install Codex CLI, then log in once with:  codex login"
+  exit 1
+fi
 
-if [ "$PROVIDER" = "anthropic" ]; then
-  if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-    echo "WARNING: ANTHROPIC_API_KEY is not set."
-    echo "  The chat will show an error until you set it:"
-    echo "    export ANTHROPIC_API_KEY=sk-ant-..."
-    echo ""
-  fi
-elif [ "$PROVIDER" = "openai" ]; then
-  if [ -z "${OPENAI_API_KEY:-}" ]; then
-    echo "WARNING: OPENAI_API_KEY is not set."
-    echo "  The chat will show an error until you set it:"
-    echo "    export OPENAI_API_KEY=sk-..."
-    echo ""
-  fi
+# ── Friendly reminder about Audacity ────────────────────────────────────────
+MCP_URL="${MCP_URL:-http://127.0.0.1:4830/mcp}"
+if ! curl -s --max-time 2 -X POST "$MCP_URL" \
+     -d '{"jsonrpc":"2.0","id":1,"method":"ping"}' >/dev/null 2>&1; then
+  echo "NOTE: Audacity MCP server not reachable at ${MCP_URL}."
+  echo "  Launch the patched Audacity (mod-mcp-server enabled) first."
+  echo "  The chat will still load; the Audacity chip turns green once it's up."
+  echo ""
 fi
 
 # ── Start server ─────────────────────────────────────────────────────────────
 echo "Starting Audacity MCP Companion on ${URL} ..."
-echo "  Provider : ${PROVIDER}"
-echo "  Model    : ${AI_MODEL:-<default>}"
-echo "  MCP URL  : ${MCP_URL:-http://127.0.0.1:4830/mcp}"
+echo "  Backend  : Codex app-server (ChatGPT login, persistent threads)"
+echo "  MCP URL  : ${MCP_URL}"
+echo "  Model    : ${CODEX_MODEL:-<account default>}"
 echo ""
 echo "Press Ctrl+C to stop."
 echo ""
 
-# Launch server in background, open browser, then wait for server
 cd "$SCRIPT_DIR"
 python3 server.py &
 SERVER_PID=$!
 
-# Give the server a moment to start
-sleep 0.8
-
-# Open browser (macOS)
+sleep 1.0
 if command -v open &>/dev/null; then
   open "$URL"
 elif command -v xdg-open &>/dev/null; then
   xdg-open "$URL"
 fi
 
-# Wait for the server process (Ctrl+C will kill it)
 wait $SERVER_PID

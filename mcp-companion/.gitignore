@@ -1,3 +1,5 @@
 .env
 __pycache__/
 *.pyc
+# Isolated Codex home: ChatGPT auth tokens, thread/rollout history, generated config
+.codex/
