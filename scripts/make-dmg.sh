@@ -65,10 +65,11 @@ ln -s /Applications "$STAGE/Applications"
 # 3. MCP Companion (only the files needed to run; NO secrets / state)
 DEST="$STAGE/MCP Companion"
 mkdir -p "$DEST"
-for f in server.py codex_bridge.py index.html run.sh README.md "セットアップして起動.command"; do
+for f in server.py codex_bridge.py stem_mcp_server.py index.html run.sh README.md \
+         "セットアップして起動.command" "ステム分離セットアップ.command"; do
   cp "$COMP/$f" "$DEST/$f"
 done
-chmod +x "$DEST/セットアップして起動.command" "$DEST/run.sh"
+chmod +x "$DEST/セットアップして起動.command" "$DEST/ステム分離セットアップ.command" "$DEST/run.sh"
 
 # 3b. One-click launcher at the DMG root that starts BOTH Audacity and the chat
 # (it just delegates to the companion launcher, which now launches Audacity too).
@@ -130,6 +131,15 @@ Audacity MCP — 同梱物と使い方
      （API キーは不要。会話は端末内に保存され、次回も続きから使えます）
   5)「440Hz のトーンを 3 秒作って半分の音量にして書き出して」のように
      話しかけると、Audacity が動きます。
+
+----------------------------------------------------------------
+3. ステム分離（ボーカル/インスト分離・任意）
+----------------------------------------------------------------
+  「この曲のボーカルを抜いて」等の分離を使うには、MCP Companion フォルダ内の
+  「ステム分離セットアップ.command」を一度だけ実行して分離エンジン
+  （UVR / audio-separator・約 1.1GB）を導入してください。導入後はチャットで
+  「ボーカルとインストに分離して」と頼むと、書き出し→分離→トラック取り込みまで
+  自動で行います（既定 Vocals/Instrumental、4 ステムは htdemucs を指定）。
 
 ----------------------------------------------------------------
 動作要件・注意
