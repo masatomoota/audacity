@@ -246,7 +246,12 @@ void CommonTrackInfo::CloseTitleDrawFunction
 
       dc->SetTextForeground( theTheme.Colour( clrTrackPanelText ) );
       dc->SetTextBackground( wxTRANSPARENT );
-      dc->DrawText(titleStr, bev.x + 2, bev.y + (bev.height - (metrics.ascent + metrics.descent)) / 2);
+      // Vertically center the title text optically.  Centering the full em box
+      // (ascent + descent) leaves the visible glyphs sitting high, because the
+      // descent is empty for typical track names (no descenders / CJK).  Center
+      // the ascent — the inked region — so the text looks vertically centered
+      // in the title bar.
+      dc->DrawText(titleStr, bev.x + 2, bev.y + (bev.height - metrics.ascent) / 2);
 
    }
 
