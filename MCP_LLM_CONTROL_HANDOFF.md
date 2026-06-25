@@ -2,8 +2,6 @@
 
 > **ABSTRACT (English, for any LLM picking this up cold):** This document is a complete, self-contained handoff for building an **MCP (Model Context Protocol) server inside Audacity** so that an LLM can drive Audacity by natural language — the audio-app analogue of Codex/Cursor for code. It targets the **stable Audacity 3.x codebase (`audacity3` branch)**, *not* the 4.0-alpha you are currently checked out on, for reasons explained in §1 (the "dark-build" problem). You do **not** need the originating chat; everything required is below. Prose is Japanese, but all file paths, identifiers, commands, and code are English — every claim carries a `file:line` citation you can verify. Start at §0, then §1, then the roadmap in §7.
 
-> **See also:** project-wide master handoff at https://github.com/masatomoota/llm-daw-handoff (chronological narrative, decision tree, prioritized roadmap to 100%, auto-start protocol).
-
 ---
 
 ## 0. このドキュメントの使い方・前提

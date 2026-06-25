@@ -2,8 +2,6 @@
 
 > **ABSTRACT (English, for any LLM picking this up cold):** Phase 0 of the "MCP server inside Audacity" project is **DONE and end-to-end verified**. A new built-in module `mod-mcp-server` exposes an MCP (JSON-RPC 2.0) server over localhost HTTP (`POST http://127.0.0.1:4830/mcp`) and drives Audacity by reusing the existing `ScriptCommandRelay` (unchanged) — so all command execution is marshalled onto the GUI/main thread exactly like `mod-script-pipe`. It builds cleanly against **standalone Audacity 3.7.7** and a live external HTTP client successfully ran the full **Select → Generate → Effect → Export2** pipeline. This document is self-contained: it carries the exact repo layout, build commands, toolchain workarounds, runtime-enable procedure, the live verification transcript, known gotchas, and the Phase 1 plan. Prose is Japanese; all paths/identifiers/commands/code are English with `file:line` citations. The companion planning doc is `MCP_LLM_CONTROL_HANDOFF.md` (same directory). Start at §1.
 
-> **See also:** project-wide master handoff at https://github.com/masatomoota/llm-daw-handoff (chronological narrative, decision tree, prioritized roadmap to 100%, auto-start protocol).
-
 ---
 
 ## 1. 現状サマリ（一目で）
