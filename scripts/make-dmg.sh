@@ -65,7 +65,8 @@ ln -s /Applications "$STAGE/Applications"
 # 3. MCP Companion (only the files needed to run; NO secrets / state)
 DEST="$STAGE/MCP Companion"
 mkdir -p "$DEST"
-for f in server.py codex_bridge.py stem_mcp_server.py index.html run.sh README.md \
+for f in server.py codex_bridge.py stem_mcp_server.py transcribe_mcp_server.py \
+         index.html run.sh README.md \
          "セットアップして起動.command" "ステム分離セットアップ.command"; do
   cp "$COMP/$f" "$DEST/$f"
 done
@@ -133,13 +134,16 @@ Audacity MCP — 同梱物と使い方
      話しかけると、Audacity が動きます。
 
 ----------------------------------------------------------------
-3. ステム分離（ボーカル/インスト分離・任意）
+3. ステム分離・文字起こし（音声AI・任意）
 ----------------------------------------------------------------
-  「この曲のボーカルを抜いて」等の分離を使うには、MCP Companion フォルダ内の
-  「ステム分離セットアップ.command」を一度だけ実行して分離エンジン
-  （UVR / audio-separator・約 1.1GB）を導入してください。導入後はチャットで
-  「ボーカルとインストに分離して」と頼むと、書き出し→分離→トラック取り込みまで
-  自動で行います（既定 Vocals/Instrumental、4 ステムは htdemucs を指定）。
+  「ボーカルを抜いて」「この音声を文字起こしして」等を使うには、MCP Companion
+  フォルダ内の「ステム分離セットアップ.command」を一度だけ実行して音声AIエンジン
+  （UVR/audio-separator ＋ ローカル Whisper/mlx-whisper・約 1.5GB）を導入して
+  ください。導入後はチャットで:
+  ・「ボーカルとインストに分離して」→ 書き出し→分離→トラック取り込みまで自動
+    （既定 Vocals/Instrumental、4 ステムは htdemucs を指定）。
+  ・「この音声を文字起こしして」→ 書き出し→Whisper→全文＋タイムスタンプを返す
+    （端末内で処理・APIキー不要）。
 
 ----------------------------------------------------------------
 動作要件・注意

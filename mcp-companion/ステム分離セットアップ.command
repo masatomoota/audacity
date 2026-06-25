@@ -14,7 +14,7 @@ VENV="$HOME/.audacity-mcp-companion/sep-venv"
 say()   { printf '%s\n' "$*"; }
 pause() { echo; read -r -n 1 -s -p "Enter キーで閉じます… "; echo; }
 
-say "=== ステム分離エンジンのセットアップ ==="
+say "=== 音声AI（ステム分離・文字起こし）セットアップ ==="
 
 if [ "$(uname -m)" != "arm64" ]; then
   say "✖ Apple Silicon (arm64) 専用です（現在: $(uname -m)）。"; pause; exit 1
@@ -32,20 +32,23 @@ if [ -z "$PY" ]; then
 fi
 say "使用する Python: $($PY --version 2>&1) ($PY)"
 
-if [ -x "$VENV/bin/audio-separator" ]; then
-  say "既に導入済みです: $("$VENV/bin/audio-separator" --version 2>&1 | head -1)"
+if [ -x "$VENV/bin/audio-separator" ] && [ -x "$VENV/bin/mlx_whisper" ]; then
+  say "既に導入済みです（ステム分離・文字起こしの両方）。"
   say "再導入する場合はフォルダを削除してください: rm -rf \"$VENV\""
   pause; exit 0
 fi
 
-say "audio-separator を $VENV に導入します（約 1.1GB・数分かかります）…"
-"$PY" -m venv "$VENV" || { say "✖ venv の作成に失敗しました。"; pause; exit 1; }
+say "音声AIエンジンを $VENV に導入します（約 1.5GB・数分かかります）…"
+say "  - audio-separator（UVR ステム分離）"
+say "  - mlx-whisper（ローカル文字起こし・Apple GPU）"
+[ -d "$VENV/bin" ] || "$PY" -m venv "$VENV" || { say "✖ venv の作成に失敗しました。"; pause; exit 1; }
 "$VENV/bin/python" -m pip install --upgrade pip -q
-if "$VENV/bin/pip" install "audio-separator[cpu]"; then
+if "$VENV/bin/pip" install "audio-separator[cpu]" mlx-whisper; then
   say ""
-  say "✓ 完了: $("$VENV/bin/audio-separator" --version 2>&1 | head -1)"
-  say "AI チャットで『この音声をボーカルとインストに分離して』のように頼めます。"
-  say "（初回の分離時に分離モデルが自動ダウンロードされます。）"
+  say "✓ 完了。AI チャットで次のように頼めます:"
+  say "  ・「この音声をボーカルとインストに分離して」"
+  say "  ・「この音声を文字起こしして」"
+  say "（初回の実行時に各モデルが自動ダウンロードされます。）"
 else
   say "✖ 導入に失敗しました。ネットワークをご確認のうえ再実行してください。"
 fi
