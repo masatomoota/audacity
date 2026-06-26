@@ -160,7 +160,7 @@ It handles initialization and termination by subclassing wxApp.
 #endif
 
 
-#include "../images/Audacity-splash.xpm"
+#include "../images/OtisSplash.xpm"
 
 #include <thread>
 
@@ -1287,7 +1287,7 @@ void AudacityApp::ShowSplashScreen() {
    GetNextWindowPlacement(&wndRect, &bMaximized, &bIconized);
 
    // BG: Create a temporary window to set as the top window
-   wxImage logoimage((const char**)Audacity_splash_xpm);
+   wxImage logoimage((const char**)Otis_splash_xpm);
    logoimage.Scale(logoimage.GetWidth() * (2.0 / 3.0), logoimage.GetHeight() * (2.0 / 3.0), wxIMAGE_QUALITY_HIGH);
 #ifdef __WXMSW__
    // We need to mirror the image for right-to-left languages on Windows only
