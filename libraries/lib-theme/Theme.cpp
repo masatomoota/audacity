@@ -1309,7 +1309,10 @@ ChoiceSetting &GUITheme()
       return symbols;
    };
 
-   constexpr int defaultTheme = 1; // "light"
+   // Otis: default to the flat modern "dark" theme (index 2 in the sorted list
+   // classic=0, light=1, dark=2, high-contrast=3) instead of the dated light
+   // theme with its grey/beveled "Windows-95"-looking toolbars.
+   constexpr int defaultTheme = 2; // "dark"
 
    static ChoiceSetting setting {
       wxT("/GUI/Theme"), symbols(), defaultTheme
