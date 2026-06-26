@@ -35,6 +35,10 @@
 #include "DoEffect.h"
 #include "prefs/GUIPrefs.h"
 
+// Otis: needed by OnOpenChat to launch Chrome in --app mode on macOS.
+#include <wx/utils.h>
+#include <wx/filename.h>
+
 // private helper classes and functions
 namespace {
 
@@ -215,7 +219,37 @@ void OnBenchmark(const CommandContext &context)
 // launched via the Otis + AI chat launcher).
 void OnOpenChat(const CommandContext &)
 {
-   BasicUI::OpenInDefaultBrowser(wxT("http://127.0.0.1:8765"));
+   const wxString kChatUrl = wxT("http://127.0.0.1:8765");
+#if defined(__WXMAC__)
+   // Prefer Google Chrome in --app mode for a borderless dedicated window
+   // (matches the mcp-companion/セットアップして起動.command launcher).
+   // Fall back to the system default browser if Chrome isn't installed or
+   // wxExecute fails.
+   // Invoke Chrome's binary DIRECTLY (not via `open`). The `open -na` path
+   // doesn't reliably pass --app= because macOS LaunchServices merges into the
+   // already-running Chrome and drops the args — the result is a regular tab,
+   // not a borderless --app window. Calling the binary path side-steps that
+   // and forces a dedicated --app process (Chrome multi-instances cleanly).
+   const wxString kChromeBin =
+      wxT("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome");
+   bool launched = false;
+   if (wxFileName::FileExists(kChromeBin))
+   {
+      // Wrap the path in double-quotes so wxExecute's command-line tokenizer
+      // keeps it as a single argument (the path contains a space in
+      // "Google Chrome").
+      const wxString cmd =
+         wxT("\"") + kChromeBin + wxT("\" --app=") + kChatUrl;
+      long pid = wxExecute(cmd, wxEXEC_ASYNC);
+      launched = (pid != 0);
+   }
+   if (!launched)
+   {
+      BasicUI::OpenInDefaultBrowser(kChatUrl);
+   }
+#else
+   BasicUI::OpenInDefaultBrowser(kChatUrl);
+#endif
 }
 
 void OnSimulateRecordingErrors(const CommandContext &context)

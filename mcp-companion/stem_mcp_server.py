@@ -87,10 +87,44 @@ def _text(s, is_error=False):
     return {"content": [{"type": "text", "text": s}], "isError": is_error}
 
 
+def _validate_input_audio(path):
+    """Defensive check: Audacity's Export2 returns OK even when the time
+    selection is empty (Start==End), producing a header-only file. Catch that
+    here and tell the agent exactly what to do, instead of letting
+    audio-separator fail with a cryptic error a few seconds later. Accept both
+    WAV (RIFF) and AIFF (FORM...AIFF) since Audacity's Export2 actually writes
+    AIFF regardless of the .wav extension."""
+    try:
+        size = os.path.getsize(path)
+    except OSError as e:
+        return f"could not stat input file {path}: {e}"
+    if size < 4096:
+        return (
+            f"input file {path} is only {size} bytes — Otis exported a header "
+            f"with no audio. This usually means the time selection was empty. "
+            f"Before Export2, run 'SelectAll:' so the whole project is exported.")
+    try:
+        with open(path, "rb") as f:
+            head = f.read(12)
+    except OSError as e:
+        return f"could not read input file {path}: {e}"
+    is_wav  = head[0:4] == b"RIFF" and head[8:12] == b"WAVE"
+    is_aiff = head[0:4] == b"FORM" and head[8:12] in (b"AIFF", b"AIFC")
+    if not (is_wav or is_aiff):
+        return (
+            f"input file {path} is not a recognized WAV/AIFF audio container "
+            f"(magic={head[:4]!r}). Re-export from Otis with Export2 after "
+            f"'SelectAll:'.")
+    return None
+
+
 def do_separate(args):
     inp = args.get("input_path", "")
     if not inp or not os.path.isfile(inp):
         return _text(f"input_path not found: {inp}", True)
+    err = _validate_input_audio(inp)
+    if err:
+        return _text(err, True)
     if not AUDIO_SEP.exists():
         return _text(
             f"audio-separator is not installed at {AUDIO_SEP}. Create the venv "

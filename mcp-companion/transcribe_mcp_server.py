@@ -138,10 +138,38 @@ def _transcribe_openai(inp, language, model):
     return out
 
 
+def _validate_input_audio(path):
+    # Same defensive check as stem_mcp_server (Export2 + empty selection
+    # produces a header-only 410-byte AIFF). Accepts WAV (RIFF) and AIFF.
+    try:
+        size = os.path.getsize(path)
+    except OSError as e:
+        return f"could not stat input file {path}: {e}"
+    if size < 4096:
+        return (
+            f"input file {path} is only {size} bytes — Otis exported a header "
+            f"with no audio. Before Export2, run 'SelectAll:' so the whole "
+            f"project is exported.")
+    try:
+        with open(path, "rb") as f:
+            head = f.read(12)
+    except OSError as e:
+        return f"could not read input file {path}: {e}"
+    if not ((head[0:4] == b"RIFF" and head[8:12] == b"WAVE")
+            or (head[0:4] == b"FORM" and head[8:12] in (b"AIFF", b"AIFC"))):
+        return (
+            f"input file {path} is not a recognized WAV/AIFF container "
+            f"(magic={head[:4]!r}). Re-export with Export2 after 'SelectAll:'.")
+    return None
+
+
 def do_transcribe(args):
     inp = args.get("input_path", "")
     if not inp or not os.path.isfile(inp):
         return _text(f"input_path not found: {inp}", True)
+    err = _validate_input_audio(inp)
+    if err:
+        return _text(err, True)
     language = (args.get("language") or "").strip()
     model = args.get("model") or DEFAULT_MODEL
 
