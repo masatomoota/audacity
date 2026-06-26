@@ -111,6 +111,22 @@
     padding: 10px 12px; cursor: pointer; text-align: left; font: inherit;
   }
   .examples button:hover { border-color: var(--accent); }
+  #approvals { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  #approvals:empty { display: none; }
+  .approval-card {
+    background: #2a1d12; border: 1px solid var(--danger); border-radius: 10px;
+    padding: 10px 12px; font-size: 13px; color: var(--text);
+  }
+  .approval-card .ttl { font-weight: 600; color: #ffb27a; margin-bottom: 4px; }
+  .approval-card code {
+    display: block; background: #00000045; border-radius: 6px; padding: 6px 8px;
+    margin: 4px 0; white-space: pre-wrap; word-break: break-all;
+    font-family: ui-monospace, monospace; font-size: 12px;
+  }
+  .approval-card .row { display: flex; gap: 8px; margin-top: 8px; }
+  .approval-card button { border: none; border-radius: 8px; padding: 7px 16px; cursor: pointer; font-weight: 600; }
+  .approval-card .allow { background: var(--accent); color: #fff; }
+  .approval-card .deny { background: var(--danger); color: #fff; }
 </style>
 </head>
 <body>
@@ -138,6 +154,7 @@
         <button id="send">送信</button>
         <button id="stop">停止</button>
       </div>
+      <div id="approvals"></div>
       <div class="hint">Enter で送信 · Shift+Enter で改行 · 会話は Codex スレッドとして保存されます</div>
     </div>
   </section>
@@ -380,8 +397,34 @@ function handleEvent(ev, d) {
   } else if (ev === "tool_start") { toolCard(d, true);
   } else if (ev === "tool_end") { toolCard(d, false);
   } else if (ev === "message") { setAssistant(d.text);
-  } else if (ev === "done") { cur = null;
-  } else if (ev === "error") { ensureAssistant()._body.textContent += "\n[エラー] " + (d.message||""); cur = null; }
+  } else if (ev === "approval") { showApproval(d);
+  } else if (ev === "done") { clearApprovals(); cur = null;
+  } else if (ev === "error") { clearApprovals(); ensureAssistant()._body.textContent += "\n[エラー] " + (d.message||""); cur = null; }
+}
+
+function clearApprovals() { const z = document.getElementById("approvals"); if (z) z.innerHTML = ""; }
+
+function showApproval(d) {
+  const z = document.getElementById("approvals");
+  const card = document.createElement("div"); card.className = "approval-card";
+  const ttl = document.createElement("div"); ttl.className = "ttl";
+  ttl.textContent = "⚠️ 実行の許可を求めています（Audacity 外の操作）"; card.appendChild(ttl);
+  const code = document.createElement("code");
+  code.textContent = d.command || (d.changes ? "ファイルの変更" : "(コマンド不明)"); card.appendChild(code);
+  if (d.cwd)    { const c = document.createElement("div"); c.textContent = "場所: " + d.cwd; card.appendChild(c); }
+  if (d.reason) { const r = document.createElement("div"); r.textContent = "理由: " + d.reason; card.appendChild(r); }
+  const row = document.createElement("div"); row.className = "row";
+  const allow = document.createElement("button"); allow.className = "allow"; allow.textContent = "許可";
+  const deny  = document.createElement("button"); deny.className  = "deny";  deny.textContent  = "拒否";
+  row.appendChild(allow); row.appendChild(deny); card.appendChild(row);
+  const decide = (ok) => {
+    card.remove();
+    fetch("/api/approval", { method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({requestId: d.requestId, allow: ok}) }).catch(() => {});
+  };
+  allow.onclick = () => decide(true);
+  deny.onclick = () => decide(false);
+  z.appendChild(card);
 }
 
 async function stop() {

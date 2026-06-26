@@ -80,12 +80,43 @@ class CodexAppServer:
         # Listeners notified on ANY account/* notification (for "logged in?" UI).
         self._account_listeners = []
 
+        # requestId -> method, for shell/file/exec approvals routed to the UI and
+        # resolved later by the user's decision (never block the reader thread).
+        self._pending_approvals = {}
+        self._approvals_lock = threading.Lock()
+
         self.initialize_result = None
         self._started = False
-
         # Threads this app-server process has already started or resumed (loaded
         # into memory). turn/start requires the thread to be loaded first.
         self.loaded_threads = set()
+
+    # Approval methods that the USER decides (routed to the UI); everything else
+    # is auto-answered so MCP tools never prompt.
+    USER_DECISION_APPROVALS = {
+        "item/commandExecution/requestApproval",
+        "execCommandApproval",
+        "applyPatchApproval",
+        "item/fileChange/requestApproval",
+        "item/permissions/requestApproval",
+    }
+
+    @staticmethod
+    def _approval_decision(method, allow):
+        # item/commandExecution uses accept/decline; the others use ReviewDecision
+        # (approved/denied). permissions: approved/denied works.
+        if method == "item/commandExecution/requestApproval":
+            return {"decision": "accept" if allow else "decline"}
+        return {"decision": "approved" if allow else "denied"}
+
+    def resolve_approval(self, request_id, allow):
+        """Called from the HTTP layer when the user clicks 許可/拒否."""
+        with self._approvals_lock:
+            method = self._pending_approvals.pop(request_id, None)
+        if method is None:
+            return False
+        self._respond(request_id, self._approval_decision(method, allow))
+        return True
 
     # ------------------------------------------------------------------ start
     def start(self, initialize_timeout=30):
@@ -304,15 +335,52 @@ class CodexAppServer:
     def _handle_server_request(self, msg):
         method = msg.get("method", "")
         rid = msg["id"]
-        # Auto-approve everything: this is a localhost tool the user explicitly
-        # drives.  Approval requests should not normally fire (approval_policy
-        # is "never"), but answer defensively so a turn never deadlocks.
-        if method.endswith("requestApproval"):
-            self._respond(rid, {"decision": "acceptForSession"})
+        params = msg.get("params") or {}
+
+        # Shell / file / exec / patch / permission approvals → ask the USER via
+        # the UI. We must NOT block this reader thread, so we route the request
+        # to the active turn's SSE subscriber and respond later from
+        # resolve_approval(). If nobody is listening, DENY (fail closed).
+        if method in self.USER_DECISION_APPROVALS:
+            descriptor = {
+                "requestId": rid,
+                "method": method,
+                "command": params.get("command"),
+                "cwd": params.get("cwd"),
+                "reason": params.get("reason"),
+                "changes": params.get("changes"),
+            }
+            with self._approvals_lock:
+                self._pending_approvals[rid] = method
+            tid = params.get("threadId")
+            subs = []
+            with self._subs_lock:
+                if tid and tid in self._subs:
+                    subs = list(self._subs[tid])
+                else:  # no threadId match → broadcast to any active stream
+                    subs = [q for s in self._subs.values() for q in s]
+            for q in subs:
+                q.put({"_approval": descriptor})
+            if not subs:
+                # No UI is listening → fail closed (deny) so nothing runs silently.
+                self._log("approval with no UI listener; denying:", method)
+                with self._approvals_lock:
+                    self._pending_approvals.pop(rid, None)
+                self._respond(rid, self._approval_decision(method, False))
+            return
+
+        # Everything else is auto-answered so MCP tools never prompt the user.
+        # Under a non-"never" approval policy, calls to our (trusted, local) MCP
+        # servers surface as elicitation requests — ACCEPT them so audacity /
+        # stem / transcribe keep working. Shell/exec use the separate
+        # commandExecution approval channel above, which is routed to the UI.
+        if method == "mcpServer/elicitation/request":
+            self._respond(rid, {"action": "accept", "content": {}})
         elif method == "item/tool/requestUserInput":
             self._respond(rid, {"response": ""})
+        elif method.endswith("Approval") or method.endswith("requestApproval"):
+            self._respond(rid, {"decision": "approved"})  # benign approvals
         else:
-            # Unknown server request — reply with empty result rather than hang.
             self._log("auto-empty reply to server request:", method)
             self._respond(rid, {})
 
