@@ -27,6 +27,7 @@
   }
   #sidebar h1 { font-size: 14px; margin: 0; padding: 14px 16px; border-bottom: 1px solid var(--border); }
   #sidebar h1 span { color: var(--accent); }
+  #sidebar h1 .otis-mark { width: 18px; height: 18px; vertical-align: -4px; margin-right: 7px; }
   #newchat {
     margin: 12px; padding: 9px 12px; background: var(--accent); color: #fff; border: none;
     border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px;
@@ -135,7 +136,7 @@
 </head>
 <body>
   <aside id="sidebar">
-    <h1>Otis <span>コンパニオン</span></h1>
+    <h1><svg class="otis-mark" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="256" cy="256" r="176.69" fill="none" stroke="#D8382A" stroke-width="45.98"/><rect x="108.84" y="221.02" width="18.02" height="69.96" rx="9.01" fill="#D8382A"/><rect x="131.87" y="207.03" width="18.02" height="97.94" rx="9.01" fill="#D8382A"/><rect x="154.89" y="192.04" width="18.02" height="127.93" rx="9.01" fill="#D8382A"/><rect x="177.91" y="175.05" width="18.02" height="161.91" rx="9.01" fill="#D8382A"/><rect x="200.94" y="158.06" width="18.02" height="195.89" rx="9.01" fill="#D8382A"/><rect x="223.96" y="143.07" width="18.02" height="225.87" rx="9.01" fill="#D8382A"/><rect x="246.99" y="131.07" width="18.02" height="249.86" rx="9.01" fill="#D8382A"/><rect x="270.01" y="143.07" width="18.02" height="225.87" rx="9.01" fill="#D8382A"/><rect x="293.04" y="158.06" width="18.02" height="195.89" rx="9.01" fill="#D8382A"/><rect x="316.06" y="175.05" width="18.02" height="161.91" rx="9.01" fill="#D8382A"/><rect x="339.09" y="192.04" width="18.02" height="127.93" rx="9.01" fill="#D8382A"/><rect x="362.11" y="207.03" width="18.02" height="97.94" rx="9.01" fill="#D8382A"/><rect x="385.14" y="221.02" width="18.02" height="69.96" rx="9.01" fill="#D8382A"/></svg>Otis <span>コンパニオン</span></h1>
     <button id="newchat">+ 新規チャット</button>
     <div id="threads"></div>
     <div id="sidefoot"><b>Codex app-server</b> 搭載<br/><span id="modelinfo"></span></div>

@@ -45,7 +45,7 @@ hold information about one contributor to Audacity.
 #include "AllThemeResources.h"
 #include "Theme.h"
 
-#include "../images/AudacityLogoWithName.xpm"
+#include "../images/OtisLogoWithName.xpm"
 
 // Notice this is a "system include".  This is on purpose and only until
 // we convert over to CMake.  Once converted, the "RevisionIndent.h" file
@@ -460,8 +460,8 @@ void AboutDialog::PopulateAudacityPage( ShuttleGui & S )
    auto pPage = S.StartNotebookPage( ProgramName );
    S.StartVerticalLay(1);
    {
-      //v For now, change to AudacityLogoWithName via old-fashioned way, not Theme.
-      wxBitmap logo(AudacityLogoWithName_xpm); //v
+      //v Otis logo lockup (scarlet O + waveform + "Otis" on dark), via old-fashioned way, not Theme.
+      wxBitmap logo(OtisLogoWithName_xpm); //v
 
       //Setup to scale the logo larger and smaller as necessary
       const float fScale = 1.0f;

@@ -1704,7 +1704,8 @@ bool AudacityApp::InitPart2()
       // Disabled for now, after discussion.
       // project->MayCheckForUpdates();
 #ifdef HAS_WHATS_NEW
-      WhatsNewDialog::Show(*project);
+      // Otis: do not pop the "What's New" / Audacity-4 promo panel at startup.
+      // Was: WhatsNewDialog::Show(*project);
 #endif
    }
 
