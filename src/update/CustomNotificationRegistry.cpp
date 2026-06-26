@@ -6,25 +6,18 @@
  **********************************************************************/
 
 #include "CustomNotificationRegistry.h"
-#include "Audacity40PromoDialog.h"
 
+// Otis: the "Audacity 4.0" release promo dialog is removed — Otis ships no
+// custom upsell/notification dialogs.
 bool CustomNotificationRegistry::HasCustomDialog(const wxString& uuid)
 {
-    // UUID for Audacity 4.0 promotional dialog
-    if (uuid == "audacity-4.0-release-promo") return true;
-
+    (void)uuid;
     return false;
 }
 
 int CustomNotificationRegistry::ShowCustomDialog(wxWindow* parent, const Notification& notification)
 {
-    const wxString& uuid = notification.uuid;
-
-    if (uuid == "audacity-4.0-release-promo")
-    {
-        Audacity40PromoDialog dlg(parent, notification);
-        return dlg.ShowModal();
-    }
-
+    (void)parent;
+    (void)notification;
     return wxID_NONE;
 }

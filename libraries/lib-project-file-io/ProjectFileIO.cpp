@@ -1329,7 +1329,7 @@ bool ProjectFileIO::RenameOrWarn(const FilePath &src, const FilePath &dst)
    {
       ShowError( *ProjectFramePlacement(&mProject),
          XO("Error Writing to File"),
-         XO("Audacity failed to write file %s.\n"
+         XO("Otis failed to write file %s.\n"
             "Perhaps disk is full or not writable.\n"
             "For tips on freeing up space, click the help button.")
             .Format(dst),

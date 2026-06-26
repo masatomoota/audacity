@@ -21,16 +21,16 @@ TranslatableString FileException::ErrorMessage() const
    TranslatableString format;
    switch (cause) {
       case Cause::Open:
-         format = XO("Audacity failed to open a file in %s.");
+         format = XO("Otis failed to open a file in %s.");
          break;
       case Cause::Read:
-         format = XO("Audacity failed to read from a file in %s.");
+         format = XO("Otis failed to read from a file in %s.");
          break;
       case Cause::Write:
          return WriteFailureMessage(fileName);
       case Cause::Rename:
          format =
-XO("Audacity successfully wrote a file in %s but failed to rename it as %s.");
+XO("Otis successfully wrote a file in %s but failed to rename it as %s.");
       default:
          break;
    }
@@ -59,7 +59,7 @@ wxString FileException::ErrorHelpUrl() const
 TranslatableString
 FileException::WriteFailureMessage(const wxFileName &fileName)
 {
-   return XO("Audacity failed to write to a file.\n"
+   return XO("Otis failed to write to a file.\n"
      "Perhaps %s is not writable or the disk is full."
    ).Format(FileNames::AbbreviatePath(fileName));
 }

@@ -1692,7 +1692,9 @@ bool AudacityApp::InitPart2()
    HideSplashScreen(splashFadeOut);
 
 #if defined(HAVE_UPDATES_CHECK)
-   UpdateManager::Start(playingJournal);
+   // Otis: update checking is disabled — Otis has no update server, and this also
+   // suppresses the remote "Audacity 4" promo / update notifications.
+   // Was: UpdateManager::Start(playingJournal);
 #endif
 
    if (!playingJournal && ProjectSettings::Get(*project).GetShowSplashScreen())

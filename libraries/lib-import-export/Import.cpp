@@ -700,7 +700,7 @@ bool Importer::Import(
    {
       if( unusableImportPlugin->SupportsExtension(extension) )
       {
-         errorMessage = XO("This version of Audacity was not compiled with %s support.")
+         errorMessage = XO("This version of Otis was not compiled with %s support.")
             .Format( unusableImportPlugin->GetPluginFormatDescription() );
          return false;
       }

@@ -316,7 +316,7 @@ void ModuleManager::TryLoadModules(
             XO("Yes"), XO("No"),
          };  // could add a button here for 'yes and remember that', and put it into the cfg file.  Needs more thought.
          int action = BasicUI::ShowMultiDialog(msg,
-            XO("Audacity Module Loader"),
+            XO("Otis Module Loader"),
             buttons,
             "",
             XO("Try and load this module?"),
