@@ -1,8 +1,35 @@
 # Handoff — Rebrand to "Otis" + new app icon
 
-**Status:** assets ready, code changes NOT yet applied. This document is the implementation brief.
+**Status:** ✅ **APPLIED 2026-06-26** (macOS legacy app + companion). The app presents as **Otis** everywhere users look. This document remains the implementation brief; see "Implementation status" below for what was actually done, the gaps found in this brief, and what was deferred.
 **Audience:** the engineer/LLM who will apply the rename and wire in the new icon.
 **Scope:** product-name rename (Audacity → Otis) and app-icon replacement only. The UI accent-color change is a separate brief: see `OTIS_UI_COLOR_HANDOFF.md`.
+
+---
+
+## Implementation status (2026-06-26)
+
+**Approach — display-name, not bundle-dir rename.** The literal `Otis.app` bundle rename (changing `AUDACITY_NAME`) was attempted and **reverted**: the macOS bundle name has *multiple* hardcoded sources that diverge (`AUDACITY_NAME`→exe, `mac/Wrapper.c` hardcodes the exe name, `CMakeLists.txt:454 _APPDIR`, the build-time codesign path, **and the wx/conan framework deploy is keyed to the CMake `TARGET` name "Audacity"**). Unifying on `Otis.app` requires renaming the `TARGET` (ripples through hundreds of `${TARGET}` refs) — high risk, no user-visible gain. Instead:
+- The bundle stays `Audacity.app` on disk (Group B identity preserved), but **`CFBundleName` + `CFBundleDisplayName` = "Otis"** and `CFBundleIconFile = Otis.icns` → Finder, Dock, menu bar, and icon all show **Otis**.
+- `scripts/make-dmg.sh` stages/distributes it **as `Otis.app`** (dir rename at package time; `CFBundleExecutable=Wrapper` works regardless of dir name).
+- `src/AudacityApp.cpp` `SetAppDisplayName("Otis")` (kept `SetAppName`/`SetVendorName` = `AppName` so the config/data dir is preserved).
+
+**Applied (verified at runtime — menu/title/About/recovery all read "Otis", MCP works):**
+- Bundle plist: `CFBundleName`/`CFBundleDisplayName`/`CFBundleIconFile`/version/mic strings → Otis; `Otis.icns` copied to `mac/Resources/` and referenced in `src/CMakeLists.txt`.
+- Legacy in-app strings → Otis: splash, About menu + `AboutDialog` ProgramName, **window title** (`lib-project-file-io/ProjectFileIO.cpp` `SetProjectTitle`), Preferences, Help/File menus, config/recovery/lang/timer/crash/mixer/toolbar/what's-new/plugin/MIR/benchmark dialogs.
+- Companion (`mcp-companion/index.html`): title, all visible UI strings, scarlet `--accent`, Otis SVG favicon.
+- AU4 visible strings, Windows `audacity.rc` + `.iss` display names, `mac/Install.txt`, READMEs.
+
+**Gaps in THIS brief that were found & handled (Group A was incomplete):**
+- `mac/Wrapper.c:32` hardcodes the exe name — a literal rename breaks launch without patching it.
+- `CMakeLists.txt:454 _APPDIR` + build codesign path + the `TARGET`-keyed framework deploy — the real reasons a bundle rename splits into two bundles.
+- The completeness sweep excluded `libraries/`, but `lib-project-file-io` (window title) and others there hold first-party user-facing strings.
+
+**Deferred (need a product decision — NOT done):**
+- Literal on-disk `Otis.app` bundle (needs the `TARGET` rename pass).
+- ~38 `libraries/` engine strings: attribution ("The Audacity Team"), plugin descriptions ("Provides … to Audacity"), project-format-version messages, error dialogs ("Audacity could not write…") — many are arguably about the upstream engine; do a deliberate keep/change pass.
+- In-app **update dialogs** (`src/update/*`) point at Audacity's update server — rename is misleading; better to disable for Otis.
+- `src/update/Audacity40PromoDialog.cpp` — the "Audacity 4 cloud" upsell; likely remove for Otis.
+- Windows installer `[Icons]`/`[Run]` exe-name coupling (`audacity.exe` vs the renamed exe) — needs a dedicated Windows pass (Windows not built/tested here).
 
 ---
 

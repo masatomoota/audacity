@@ -148,7 +148,7 @@ void ImportExportPrefs::PopulateOrExchange(ShuttleGui & S)
 
    S.StartStatic(XO("Music Imports"));
    {
-      S.StartStatic(XO("When importing a music loop into an empty project, Audacity will:"));
+      S.StartStatic(XO("When importing a music loop into an empty project, Otis will:"));
       {
 #if defined(__WXMAC__)
          // see https://bugzilla.audacityteam.org/show_bug.cgi?id=2692
@@ -167,7 +167,7 @@ void ImportExportPrefs::PopulateOrExchange(ShuttleGui & S)
       }
       S.EndStatic();
 
-      S.StartStatic(XO("When importing a music loop into an existing (non-empty) project, Audacity will:"));
+      S.StartStatic(XO("When importing a music loop into an existing (non-empty) project, Otis will:"));
       {
 #if defined(__WXMAC__)
          // see https://bugzilla.audacityteam.org/show_bug.cgi?id=2692

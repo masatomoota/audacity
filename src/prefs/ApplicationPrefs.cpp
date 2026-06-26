@@ -81,7 +81,7 @@ void ApplicationPrefs::PopulateOrExchange(ShuttleGui & S)
          /* i18n-hint: Check-box title that configures periodic updates checking. */
          const auto checkBoxLabel = XXC("&Check for updates", "application preferences");
          const auto checkBoxDescription =
-            XO("App update checking requires network access. In order to protect your privacy, Audacity does not store any personal information.");
+            XO("App update checking requires network access. In order to protect your privacy, Otis does not store any personal information.");
 
          wxCheckBox* checkBox = S.Name(checkBoxLabel + Verbatim(", ") + checkBoxDescription)
             .TieCheckBox(checkBoxLabel, *DefaultUpdatesCheckingFlag);

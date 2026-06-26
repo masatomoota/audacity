@@ -741,8 +741,8 @@ const UiActionList ProjectUiActions::m_actions = {
     UiAction("about-audacity",
              au::context::UiCtxAny,
              au::context::CTX_ANY,
-             TranslatableString("action", "About Audacity"),
-             TranslatableString("action", "About Audacity")
+             TranslatableString("action", "About Otis"),
+             TranslatableString("action", "About Otis")
              ),
 
     UiAction("file-save-to-cloud",

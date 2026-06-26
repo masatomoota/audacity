@@ -3,11 +3,15 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Audacity コンパニオン · Codex</title>
+<title>Otis コンパニオン · Codex</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJPdGlzIj4KICA8Y2lyY2xlIGN4PSIyNTYuMDAiIGN5PSIyNTYuMDAiIHI9IjE3Ni42OSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRDgzODJBIiBzdHJva2Utd2lkdGg9IjQ1Ljk4Ii8+CiAgPHJlY3QgeD0iMTA4Ljg0IiB5PSIyMjEuMDIiIHdpZHRoPSIxOC4wMiIgaGVpZ2h0PSI2OS45NiIgcng9IjkuMDEiIGZpbGw9IiNEODM4MkEiLz4KICA8cmVjdCB4PSIxMzEuODciIHk9IjIwNy4wMyIgd2lkdGg9IjE4LjAyIiBoZWlnaHQ9Ijk3Ljk0IiByeD0iOS4wMSIgZmlsbD0iI0Q4MzgyQSIvPgogIDxyZWN0IHg9IjE1NC44OSIgeT0iMTkyLjA0IiB3aWR0aD0iMTguMDIiIGhlaWdodD0iMTI3LjkzIiByeD0iOS4wMSIgZmlsbD0iI0Q4MzgyQSIvPgogIDxyZWN0IHg9IjE3Ny45MSIgeT0iMTc1LjA1IiB3aWR0aD0iMTguMDIiIGhlaWdodD0iMTYxLjkxIiByeD0iOS4wMSIgZmlsbD0iI0Q4MzgyQSIvPgogIDxyZWN0IHg9IjIwMC45NCIgeT0iMTU4LjA2IiB3aWR0aD0iMTguMDIiIGhlaWdodD0iMTk1Ljg5IiByeD0iOS4wMSIgZmlsbD0iI0Q4MzgyQSIvPgogIDxyZWN0IHg9IjIyMy45NiIgeT0iMTQzLjA3IiB3aWR0aD0iMTguMDIiIGhlaWdodD0iMjI1Ljg3IiByeD0iOS4wMSIgZmlsbD0iI0Q4MzgyQSIvPgogIDxyZWN0IHg9IjI0Ni45OSIgeT0iMTMxLjA3IiB3aWR0aD0iMTguMDIiIGhlaWdodD0iMjQ5Ljg2IiByeD0iOS4wMSIgZmlsbD0iI0Q4MzgyQSIvPgogIDxyZWN0IHg9IjI3MC4wMSIgeT0iMTQzLjA3IiB3aWR0aD0iMTguMDIiIGhlaWdodD0iMjI1Ljg3IiByeD0iOS4wMSIgZmlsbD0iI0Q4MzgyQSIvPgogIDxyZWN0IHg9IjI5My4wNCIgeT0iMTU4LjA2IiB3aWR0aD0iMTguMDIiIGhlaWdodD0iMTk1Ljg5IiByeD0iOS4wMSIgZmlsbD0iI0Q4MzgyQSIvPgogIDxyZWN0IHg9IjMxNi4wNiIgeT0iMTc1LjA1IiB3aWR0aD0iMTguMDIiIGhlaWdodD0iMTYxLjkxIiByeD0iOS4wMSIgZmlsbD0iI0Q4MzgyQSIvPgogIDxyZWN0IHg9IjMzOS4wOSIgeT0iMTkyLjA0IiB3aWR0aD0iMTguMDIiIGhlaWdodD0iMTI3LjkzIiByeD0iOS4wMSIgZmlsbD0iI0Q4MzgyQSIvPgogIDxyZWN0IHg9IjM2Mi4xMSIgeT0iMjA3LjAzIiB3aWR0aD0iMTguMDIiIGhlaWdodD0iOTcuOTQiIHJ4PSI5LjAxIiBmaWxsPSIjRDgzODJBIi8+CiAgPHJlY3QgeD0iMzg1LjE0IiB5PSIyMjEuMDIiIHdpZHRoPSIxOC4wMiIgaGVpZ2h0PSI2OS45NiIgcng9IjkuMDEiIGZpbGw9IiNEODM4MkEiLz4KPC9zdmc+Cg==">
 <style>
   :root {
     --bg: #0e1116; --panel: #161b22; --panel2: #1c232d; --border: #2a313c;
-    --text: #e6edf3; --muted: #8b949e; --accent: #4493f8; --accent2: #2ea043;
+    --text: #e6edf3; --muted: #8b949e; --accent: #D8382A; --accent2: #2ea043;
+    --accent-strong: #C9171E; --accent-gold: #E8A33D;
+    --otis-sweep: linear-gradient(90deg, #F0B24A 0%, #DC6E29 50%, #C21A19 100%);
+    --otis-meter: linear-gradient(90deg, #F0B24A 0%, #E8842F 22%, #DE4F28 38%, #CE2018 50%, #DE4F28 62%, #E8842F 78%, #F0B24A 100%);
     --user: #1f2937; --tool: #15212b; --danger: #f85149; --warn: #d29922;
   }
   * { box-sizing: border-box; }
@@ -131,7 +135,7 @@
 </head>
 <body>
   <aside id="sidebar">
-    <h1>Audacity <span>コンパニオン</span></h1>
+    <h1>Otis <span>コンパニオン</span></h1>
     <button id="newchat">+ 新規チャット</button>
     <div id="threads"></div>
     <div id="sidefoot"><b>Codex app-server</b> 搭載<br/><span id="modelinfo"></span></div>
@@ -139,7 +143,7 @@
 
   <section id="main">
     <div id="statusbar">
-      <span class="chip"><span id="d-audacity" class="dot"></span> Audacity</span>
+      <span class="chip"><span id="d-audacity" class="dot"></span> Otis</span>
       <span class="chip"><span id="d-codex" class="dot"></span> Codex</span>
       <span id="authchip" class="chip"><span id="d-auth" class="dot"></span> <span id="authtext">確認中…</span></span>
       <span id="grow"></span>
@@ -150,7 +154,7 @@
 
     <div id="composer">
       <div id="composer-inner">
-        <textarea id="input" placeholder="Audacity に指示を入力…（例：440Hz のサイン波を 3 秒生成してノーマライズし /tmp/out.wav にエクスポート）"></textarea>
+        <textarea id="input" placeholder="Otis に指示を入力…（例：440Hz のサイン波を 3 秒生成してノーマライズし /tmp/out.wav にエクスポート）"></textarea>
         <button id="send">送信</button>
         <button id="stop">停止</button>
       </div>
@@ -173,8 +177,8 @@ function showEmpty() {
   clearChat();
   const div = document.createElement("div");
   div.className = "empty";
-  div.innerHTML = `<h2>Audacity で何をしますか？</h2>
-    <p>MCP ツールを通じて Audacity を操作します — 音声の生成・編集・計測・エクスポートが可能です。</p>
+  div.innerHTML = `<h2>Otis で何をしますか？</h2>
+    <p>MCP ツールを通じて Otis を操作します — 音声の生成・編集・計測・エクスポートが可能です。</p>
     <div class="examples">
       <button>440Hz のサイン波を 3 秒生成してノーマライズする</button>
       <button>現在開いているトラック数を教えて</button>
@@ -195,7 +199,7 @@ function msgEl(role) {
   b.className = "bubble";
   const who = document.createElement("div");
   who.className = "who";
-  who.textContent = role === "user" ? "あなた" : "Audacity コンパニオン";
+  who.textContent = role === "user" ? "あなた" : "Otis コンパニオン";
   const body = document.createElement("div");
   body.className = "body";
   b.appendChild(who); b.appendChild(body);
@@ -278,7 +282,7 @@ async function refreshStatus() {
     }
     $("#modelchip").textContent = s.model ? ("モデル: " + s.model) : "モデル: アカウント既定";
     $("#modelinfo").textContent = s.audacityTools && s.audacityTools.length
-      ? ("Audacity ツール: " + s.audacityTools.join(", ")) : "Audacity 未接続";
+      ? ("Otis ツール: " + s.audacityTools.join(", ")) : "Otis 未接続";
   } catch (e) { /* ignore */ }
 }
 
@@ -408,7 +412,7 @@ function showApproval(d) {
   const z = document.getElementById("approvals");
   const card = document.createElement("div"); card.className = "approval-card";
   const ttl = document.createElement("div"); ttl.className = "ttl";
-  ttl.textContent = "⚠️ 実行の許可を求めています（Audacity 外の操作）"; card.appendChild(ttl);
+  ttl.textContent = "⚠️ 実行の許可を求めています（Otis 外の操作）"; card.appendChild(ttl);
   const code = document.createElement("code");
   code.textContent = d.command || (d.changes ? "ファイルの変更" : "(コマンド不明)"); card.appendChild(code);
   if (d.cwd)    { const c = document.createElement("div"); c.textContent = "場所: " + d.cwd; card.appendChild(c); }

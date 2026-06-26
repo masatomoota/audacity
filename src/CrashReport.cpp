@@ -47,14 +47,14 @@ void Generate(wxDebugReport::Context ctx)
       // Provides a progress dialog with indeterminate mode
       using namespace BasicUI;
       auto pd = MakeGenericProgress({},
-         XO("Audacity Support Data"), XO("This may take several seconds"));
+         XO("Otis Support Data"), XO("This may take several seconds"));
       wxASSERT(pd);
 
       std::atomic_bool done = {false};
       auto thread = std::thread([&]
       {
          wxFileNameWrapper fn{ FileNames::Configuration() };
-         rpt.AddFile(fn.GetFullPath(), _TS("Audacity Configuration"));
+         rpt.AddFile(fn.GetFullPath(), _TS("Otis Configuration"));
          rpt.AddFile(FileNames::PluginRegistry(), wxT("Plugin Registry"));
          rpt.AddFile(FileNames::PluginSettings(), wxT("Plugin Settings"));
    
@@ -78,7 +78,7 @@ void Generate(wxDebugReport::Context ctx)
          auto logger = AudacityLogger::Get();
          if (logger)
          {
-            rpt.AddText(wxT("log.txt"), logger->GetLog(), _TS("Audacity Log"));
+            rpt.AddText(wxT("log.txt"), logger->GetLog(), _TS("Otis Log"));
          }
    
          done = true;
@@ -104,7 +104,7 @@ void Generate(wxDebugReport::Context ctx)
    {
       AudacityTextEntryDialog dlg(nullptr,
          XO("Report generated to:"),
-         XO("Audacity Support Data"),
+         XO("Otis Support Data"),
          rpt.GetCompressedFileName(),
          wxOK | wxCENTER);
       dlg.SetName(dlg.GetTitle());

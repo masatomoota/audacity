@@ -237,11 +237,11 @@ void OnWriteJournal(const CommandContext &)
    auto OnMessage =
       /* i18n-hint a "journal" is a text file that records
        the user's interactions with the application */
-      XO("A journal will be recorded after Audacity restarts.");
+      XO("A journal will be recorded after Otis restarts.");
    auto OffMessage =
       /* i18n-hint a "journal" is a text file that records
        the user's interactions with the application */
-      XO("No journal will be recorded after Audacity restarts.");
+      XO("No journal will be recorded after Otis restarts.");
 
    using namespace Journal;
    bool enabled = RecordEnabled();

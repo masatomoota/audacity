@@ -1108,7 +1108,7 @@ elseif( CMAKE_SYSTEM_NAME MATCHES "Darwin" )
 
    # Define Mac specific resources
    set( MAC_RESOURCES
-      ../mac/Resources/Audacity.icns
+      ../mac/Resources/Otis.icns
       ../mac/Resources/AudacityAIFF.icns
       ../mac/Resources/AudacityAU.icns
       ../mac/Resources/AudacityMP3.icns

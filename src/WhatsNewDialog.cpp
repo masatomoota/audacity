@@ -113,7 +113,7 @@ BEGIN_EVENT_TABLE(WhatsNewDialog, wxDialogWrapper)
 END_EVENT_TABLE()
 
 WhatsNewDialog::WhatsNewDialog(wxWindow* parent, wxWindowID id)
-   : wxDialogWrapper(parent, id, XO("Welcome to Audacity!"))
+   : wxDialogWrapper(parent, id, XO("Welcome to Otis!"))
 {
 
    SetSize(FromDIP(wxSize(WindowWidth, WindowHeight)));

@@ -73,8 +73,8 @@ hold information about one contributor to Audacity.
 
 // To substitute into many other translatable strings
 static const auto ProgramName =
-   //XO("Audacity");
-   Verbatim("Audacity");
+   //XO("Otis");
+   Verbatim("Otis");
 
 void AboutDialog::CreateCreditsList()
 {

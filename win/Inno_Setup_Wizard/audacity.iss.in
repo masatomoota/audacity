@@ -36,7 +36,7 @@ SolidCompression=yes
 DisableWelcomePage=no
 
 AppName={#AppName}
-AppVerName=Audacity {#AppVersion}
+AppVerName=Otis {#AppVersion}
 ; Specify AppVersion as well, so it appears in the Add/Remove Programs entry.
 AppVersion={#AppVersion}
 AppPublisher="Audacity Team"
@@ -46,7 +46,7 @@ AppUpdatesURL=http://audacityteam.org
 ChangesAssociations=yes
 @INSTALLER_X64_MODE@
 
-DefaultDirName={commonpf}\Audacity
+DefaultDirName={commonpf}\Otis
 
 VersionInfoProductName={#AppName}
 VersionInfoProductTextVersion={#GetFileProductVersion(AppExe)}

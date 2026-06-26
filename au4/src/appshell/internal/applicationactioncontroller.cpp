@@ -246,8 +246,8 @@ void ApplicationActionController::revertToFactorySettings()
     static constexpr bool NOTIFY_ABOUT_CHANGES = false;
     configuration()->revertToFactorySettings(KEEP_DEFAULT_SETTINGS, NOTIFY_ABOUT_CHANGES);
 
-    title = muse::trc("appshell", "Would you like to restart Audacity now?");
-    question = muse::trc("appshell", "Audacity needs to be restarted for these changes to take effect.");
+    title = muse::trc("appshell", "Would you like to restart Otis now?");
+    question = muse::trc("appshell", "Otis needs to be restarted for these changes to take effect.");
 
     int restartBtn = int(muse::IInteractive::Button::Apply);
     result = interactive()->question(title, question,

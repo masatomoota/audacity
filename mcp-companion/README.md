@@ -1,8 +1,8 @@
-# Audacity MCP Companion (Codex app-server edition)
+# Otis (Codex app-server edition)
 
-A local web chat that drives Audacity in natural language. The "brain" is the
-**Codex app server** (`codex app-server`) rather than a direct API-key call, so
-you get two things for free:
+A local web chat that drives Otis (the Audacity-based editor) in natural
+language. The "brain" is the **Codex app server** (`codex app-server`) rather
+than a direct API-key call, so you get two things for free:
 
 - **Web login** — sign in with your **ChatGPT account** in the browser. No API
   key to paste or store.
@@ -10,9 +10,9 @@ you get two things for free:
   rollout `.jsonl`. Past chats are listed in the sidebar and can be resumed, and
   context survives restarts.
 
-Codex runs the agent loop and reaches Audacity through the running
+Codex runs the agent loop and reaches Otis through the running
 `mod-mcp-server` (`http://127.0.0.1:4830/mcp`), wired up in an **isolated
-`CODEX_HOME`** so only Audacity's `run_command` / `get_info` tools are in scope —
+`CODEX_HOME`** so only Otis's `run_command` / `get_info` tools are in scope —
 none of your global Codex MCP servers leak in.
 
 > The previous API-key companion (direct Anthropic/OpenAI agent loop) is kept
@@ -22,8 +22,8 @@ none of your global Codex MCP servers leak in.
 
 ## Prerequisites
 
-1. **Audacity** (this fork, with `mod-mcp-server` enabled) running and listening
-   at `http://127.0.0.1:4830/mcp`.
+1. **Otis** (the Audacity-based editor, with `mod-mcp-server` enabled) running
+   and listening at `http://127.0.0.1:4830/mcp`.
 2. **Codex CLI** (`codex`) installed and on `PATH`. First-time login:
    ```sh
    codex login          # opens a browser; sign in with ChatGPT
@@ -41,7 +41,7 @@ cd mcp-companion
 ./run.sh
 ```
 
-`run.sh` checks Python + the Codex CLI, reminds you if Audacity isn't reachable,
+`run.sh` checks Python + the Codex CLI, reminds you if Otis isn't reachable,
 starts `server.py`, and opens `http://127.0.0.1:8765`.
 
 On first launch the server starts `codex app-server`, and — if you're already
@@ -72,7 +72,7 @@ vars). `.env` and `.codex/` are git-ignored.
 > **Sandbox note.** The generated `config.toml` uses
 > `sandbox_mode = "danger-full-access"`. Codex's restricted sandboxes
 > (`read-only` / `workspace-write`) block the agent's MCP-over-HTTP call to
-> Audacity's localhost server (the tool comes back empty / "rejected"). Full
+> Otis's localhost server (the tool comes back empty / "rejected"). Full
 > access is acceptable here: it's a localhost, user-driven audio tool, the Codex
 > home is isolated to this companion, `approval_policy = "never"`, and the
 > developer instructions forbid shell/file use. Override with `CODEX_SANDBOX` if
@@ -89,11 +89,11 @@ vars). `.env` and `.codex/` are git-ignored.
   resumes it with full context.
 - **Streaming** — assistant text streams token-by-token over Server-Sent Events;
   `run_command` / `get_info` tool calls show live as collapsible blocks.
-- **Audacity perception** — the assistant can measure audio via `GetAudioStats`,
+- **Audio perception** — the assistant can measure audio via `GetAudioStats`,
   `GetLoudness`, `GetSpectrum`, `DetectSilence`, `DetectOnsets` and reason from
   the numbers.
 - **Live status** — header chips show Codex login (email/plan) and whether
-  Audacity's MCP is connected.
+  Otis's MCP is connected.
 
 ---
 
@@ -123,8 +123,8 @@ HTTP API: `GET /api/status`, `GET /api/threads`, `GET /api/thread?id=…`,
 
 ## Troubleshooting
 
-**Audacity chip is red / not connected**
-- Make sure Audacity (with `mod-mcp-server`) is running.
+**Otis chip is red / not connected**
+- Make sure Otis (with `mod-mcp-server`) is running.
 - Verify the port: `curl -s -X POST http://127.0.0.1:4830/mcp -d '{"jsonrpc":"2.0","id":1,"method":"ping"}'`
 - Different port? `export MCP_URL=http://127.0.0.1:<port>/mcp`
 

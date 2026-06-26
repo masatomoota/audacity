@@ -207,9 +207,9 @@
 	<key>CFBundleExecutable</key>
 	<string>Wrapper</string>
 	<key>CFBundleGetInfoString</key>
-	<string>Audacity version ${AUDACITY_INFO_VERSION}</string>
+	<string>Otis version ${AUDACITY_INFO_VERSION}</string>
 	<key>CFBundleIconFile</key>
-	<string>Audacity.icns</string>
+	<string>Otis.icns</string>
 	<key>CFBundleIdentifier</key>
 	<string>org.audacityteam.audacity</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -217,7 +217,9 @@
 	<key>CFBundleLongVersionString</key>
 	<string>Version ${AUDACITY_INFO_VERSION}</string>
 	<key>CFBundleName</key>
-	<string>Audacity</string>
+	<string>Otis</string>
+	<key>CFBundleDisplayName</key>
+	<string>Otis</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -233,9 +235,9 @@
    <key>NSRequiresAquaSystemAppearance</key>
    <true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>Audacity version ${AUDACITY_INFO_VERSION}</string>
+	<string>Otis version ${AUDACITY_INFO_VERSION}</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Audacity requires access to the microphone only if you intend to record from it.</string>
+	<string>Otis requires access to the microphone only if you intend to record from it.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>CFBundleURLTypes</key>

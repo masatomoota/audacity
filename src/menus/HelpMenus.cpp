@@ -426,7 +426,7 @@ auto HelpMenu()
             AlwaysEnabledFlag ),
          Command( wxT("Manual"), XXO("&Manual"), OnManual,
             AlwaysEnabledFlag ),
-         Command( wxT("AudacitySupport"), XXO("Audacity &Support"), OnAudacitySupport,
+         Command( wxT("AudacitySupport"), XXO("Otis &Support"), OnAudacitySupport,
             AlwaysEnabledFlag )
       ),
 
@@ -480,7 +480,7 @@ auto HelpMenu()
             OnCheckForUpdates,
             AlwaysEnabledFlag ),
    #endif
-         Command( wxT("About"), XXO("&About Audacity"), OnAbout,
+         Command( wxT("About"), XXO("&About Otis"), OnAbout,
             AlwaysEnabledFlag )
       )
    ) };

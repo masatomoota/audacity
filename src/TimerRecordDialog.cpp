@@ -167,7 +167,7 @@ END_EVENT_TABLE()
 
 TimerRecordDialog::TimerRecordDialog(
    wxWindow* parent, AudacityProject &project, bool bAlreadySaved)
-: wxDialogWrapper(parent, -1, XO("Audacity Timer Record"), wxDefaultPosition,
+: wxDialogWrapper(parent, -1, XO("Otis Timer Record"), wxDefaultPosition,
            wxDefaultSize, wxCAPTION)
 , mProject{ project }
 {
@@ -570,7 +570,7 @@ int TimerRecordDialog::RunWaitDialog()
 
          TimerProgressDialog
             progress(m_TimeSpan_Duration.GetMilliseconds().GetValue(),
-                     XO("Audacity Timer Record Progress"),
+                     XO("Otis Timer Record Progress"),
                      columns,
                      pdlgHideCancelButton | pdlgConfirmStopCancel);
 
@@ -973,7 +973,7 @@ void TimerRecordDialog::PopulateOrExchange(ShuttleGui& S)
                m_pTimerAfterCompleteChoiceCtrl = S.AddChoice(XXO("After Recording completes:"),
                      {
                         XO("Do nothing") ,
-                        XO("Exit Audacity") ,
+                        XO("Exit Otis") ,
                   #ifdef __WINDOWS__
                         XO("Restart system") ,
                         XO("Shutdown system") ,
@@ -1102,7 +1102,7 @@ ProgressResult TimerRecordDialog::WaitForStart()
    wxDateTime startWait_DateTime = wxDateTime::UNow();
    wxTimeSpan waitDuration = m_DateTime_Start - startWait_DateTime;
    TimerProgressDialog progress(waitDuration.GetMilliseconds().GetValue(),
-      XO("Audacity Timer Record - Waiting for Start"),
+      XO("Otis Timer Record - Waiting for Start"),
       columns,
       pdlgHideStopButton | pdlgConfirmStopCancel | pdlgHideElapsedTime,
       /* i18n-hint: "in" means after a duration of time,
@@ -1155,7 +1155,7 @@ ProgressResult TimerRecordDialog::PreActionDelay(int iActionIndex, TimerRecordCo
    wxDateTime dtActionTime = dtNow.Add(tsWait);
 
    TimerProgressDialog dlgAction(tsWait.GetMilliseconds().GetValue(),
-                          XO("Audacity Timer Record - Waiting"),
+                          XO("Otis Timer Record - Waiting"),
                           columns,
                           pdlgHideStopButton | pdlgHideElapsedTime,
                           sCountdownLabel);

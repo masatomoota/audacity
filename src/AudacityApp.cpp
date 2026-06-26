@@ -1325,7 +1325,7 @@ void AudacityApp::ShowSplashScreen() {
    mSplashScreen->SetPosition(wndRect.GetTopLeft());
    // Centered on whichever screen it is on.
    mSplashScreen->Center();
-   mSplashScreen->SetTitle(_("Audacity is starting up..."));
+   mSplashScreen->SetTitle(_("Otis is starting up..."));
    SetTopWindow(mSplashScreen.get());
    mSplashScreen->Raise();
 }
@@ -1390,7 +1390,7 @@ void AudacityApp::OnInit0()
    if ( !ProjectFileIO::InitializeSQL() )
       this->CallAfter([]{
          ::AudacityMessageBox(
-            XO("SQLite library failed to initialize.  Audacity cannot continue.") );
+            XO("SQLite library failed to initialize.  Otis cannot continue.") );
          QuitAudacity( true );
       });
 
@@ -1440,8 +1440,10 @@ void AudacityApp::OnInit0()
 #endif
 
    wxTheApp->SetAppName(AppName);
-   // Explicitly set since OSX will use it for the "Quit" menu item
-   wxTheApp->SetAppDisplayName(AppName);
+   // Explicitly set since OSX will use it for the "Quit" menu item.
+   // Display name is the Otis brand; keep AppName/VendorName = "Audacity" so the
+   // config/data dir and module identity are preserved (see ModuleConstants.cpp).
+   wxTheApp->SetAppDisplayName(wxT("Otis"));
    wxTheApp->SetVendorName(AppName);
 
    ::wxInitAllImageHandlers();
@@ -1636,7 +1638,7 @@ bool AudacityApp::InitPart2()
       fileMenu->Append(wxID_NEW, wxString(_("&New")) + wxT("\tCtrl+N"));
       fileMenu->Append(wxID_OPEN, wxString(_("&Open...")) + wxT("\tCtrl+O"));
       fileMenu->AppendSubMenu(urecentMenu.release(), _("Open &Recent..."));
-      fileMenu->Append(wxID_ABOUT, _("&About Audacity..."));
+      fileMenu->Append(wxID_ABOUT, _("&About Otis..."));
       fileMenu->Append(wxID_PREFERENCES, wxString(_("&Preferences...")) + wxT("\tCtrl+,"));
 
       {
@@ -1996,7 +1998,7 @@ bool AudacityApp::CreateSingleInstanceChecker(const wxString &dir)
    mChecker.reset();
    auto checker = std::make_unique<wxSingleInstanceChecker>();
 
-   auto runningTwoCopiesStr = XO("Running two copies of Audacity simultaneously may cause\ndata loss or cause your system to crash.\n\n");
+   auto runningTwoCopiesStr = XO("Running two copies of Otis simultaneously may cause\ndata loss or cause your system to crash.\n\n");
 
    if (!checker->Create(name, dir))
    {
@@ -2006,7 +2008,7 @@ bool AudacityApp::CreateSingleInstanceChecker(const wxString &dir)
       auto prompt = XO(
 "Audacity was not able to lock the temporary files directory.\nThis folder may be in use by another copy of Audacity.\n")
          + runningTwoCopiesStr
-         + XO("Do you still want to start Audacity?");
+         + XO("Do you still want to start Otis?");
       int action = AudacityMessageBox(
          prompt,
          XO("Error Locking Temporary Folder"),
@@ -2098,7 +2100,7 @@ bool AudacityApp::CreateSingleInstanceChecker(const wxString &dir)
          + XO(
 "Use the New or Open commands in the currently running Audacity\nprocess to open multiple projects simultaneously.\n");
       AudacityMessageBox(
-         prompt, XO("Audacity is already running"),
+         prompt, XO("Otis is already running"),
          wxOK | wxICON_ERROR);
 
       return false;
@@ -2144,7 +2146,7 @@ bool AudacityApp::CreateSingleInstanceChecker(const wxString &dir)
       AudacityMessageBox(
          XO("Unable to create shared memory segment.\n\n"
             "error code=%d : \"%s\".").Format(errno, strerror(errno)),
-         XO("Audacity Startup Failure"),
+         XO("Otis Startup Failure"),
          wxOK | wxICON_ERROR);
 
       return false;
@@ -2183,7 +2185,7 @@ bool AudacityApp::CreateSingleInstanceChecker(const wxString &dir)
             XO("Unable to acquire semaphores.\n\n"
                "This is likely due to a resource shortage\n"
                "and a reboot may be required."),
-            XO("Audacity Startup Failure"),
+            XO("Otis Startup Failure"),
             wxOK | wxICON_ERROR);
 
          return false;
@@ -2199,7 +2201,7 @@ bool AudacityApp::CreateSingleInstanceChecker(const wxString &dir)
          XO("Unable to create semaphores.\n\n"
             "This is likely due to a resource shortage\n"
             "and a reboot may be required."),
-         XO("Audacity Startup Failure"),
+         XO("Otis Startup Failure"),
          wxOK | wxICON_ERROR);
 
       return false;
@@ -2222,7 +2224,7 @@ bool AudacityApp::CreateSingleInstanceChecker(const wxString &dir)
             XO("Unable to acquire lock semaphore.\n\n"
                "This is likely due to a resource shortage\n"
                "and a reboot may be required."),
-            XO("Audacity Startup Failure"),
+            XO("Otis Startup Failure"),
             wxOK | wxICON_ERROR);
 
          return false;
@@ -2244,7 +2246,7 @@ bool AudacityApp::CreateSingleInstanceChecker(const wxString &dir)
             XO("Unable to acquire server semaphore.\n\n"
                "This is likely due to a resource shortage\n"
                "and a reboot may be required."),
-            XO("Audacity Startup Failure"),
+            XO("Otis Startup Failure"),
             wxOK | wxICON_ERROR);
 
          return false;
@@ -2284,10 +2286,10 @@ bool AudacityApp::CreateSingleInstanceChecker(const wxString &dir)
       if (mIPCServ == nullptr)
       {
          AudacityMessageBox(
-            XO("The Audacity IPC server failed to initialize.\n\n"
+            XO("The Otis IPC server failed to initialize.\n\n"
                "This is likely due to a resource shortage\n"
                "and a reboot may be required."),
-            XO("Audacity Startup Failure"),
+            XO("Otis Startup Failure"),
             wxOK | wxICON_ERROR);
 
          return false;
@@ -2326,7 +2328,7 @@ bool AudacityApp::CreateSingleInstanceChecker(const wxString &dir)
       // Audacity is already running.
       AudacityMessageBox(
          XO("An unrecoverable error has occurred during startup"),
-         XO("Audacity Startup Failure"),
+         XO("Otis Startup Failure"),
          wxOK | wxICON_ERROR);
 
       return false;

@@ -47,19 +47,22 @@ if mcp_up; then
 else
   AUD=""
   for cand in \
-    "../Audacity.app" \                          # DMG: 「MCP Companion」の隣
-    "/Applications/Audacity.app" \               # インストール済み
-    "$HOME/Applications/Audacity.app" \
-    "../build/RelWithDebInfo/Audacity.app"; do   # 開発リポジトリ
+    "../Otis.app" \                              # DMG: 「MCP Companion」の隣
+    "/Applications/Otis.app" \                   # インストール済み
+    "$HOME/Applications/Otis.app" \
+    "../build/RelWithDebInfo/Otis.app" \         # 開発リポジトリ
+    "../Audacity.app" \                          # 後方互換（旧名）
+    "/Applications/Audacity.app" \
+    "../build/RelWithDebInfo/Audacity.app"; do
     if [ -d "$cand" ]; then AUD="$cand"; break; fi
   done
   if [ -n "$AUD" ]; then
-    say "Audacity を起動します: $AUD"
-    open "$AUD" 2>/dev/null || open -a "Audacity" 2>/dev/null \
-      || say "  起動に失敗しました。手動で Audacity を開いてください。"
+    say "Otis を起動します: $AUD"
+    open "$AUD" 2>/dev/null || open -a "Otis" 2>/dev/null || open -a "Audacity" 2>/dev/null \
+      || say "  起動に失敗しました。手動で Otis を開いてください。"
   else
-    open -a "Audacity" 2>/dev/null \
-      || say "  Audacity.app が見つかりません。Applications に入れて開いてください。"
+    open -a "Otis" 2>/dev/null || open -a "Audacity" 2>/dev/null \
+      || say "  Otis.app が見つかりません。Applications に入れて開いてください。"
   fi
 fi
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# make-dmg.sh — package the patched Audacity.app + MCP Companion into a
+# make-dmg.sh — package the patched Otis.app + MCP Companion into a
 # distributable (unsigned / ad-hoc) .dmg.
 #
 #   ./scripts/make-dmg.sh
@@ -28,8 +28,8 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="$REPO/build/RelWithDebInfo/Audacity.app"
 COMP="$REPO/mcp-companion"
 STAGE="$REPO/build/dmg-stage"
-DMG="$REPO/build/Audacity-MCP.dmg"
-VOL="Audacity MCP"
+DMG="$REPO/build/Otis-MCP.dmg"
+VOL="Otis MCP"
 
 [ -d "$APP" ] || { echo "ERROR: $APP not found — build Audacity first."; exit 1; }
 
@@ -38,19 +38,19 @@ rm -rf "$STAGE" "$DMG"
 mkdir -p "$STAGE"
 
 # 1. App (ditto preserves the bundle metadata + ad-hoc signature)
-ditto "$APP" "$STAGE/Audacity.app"
+ditto "$APP" "$STAGE/Otis.app"
 
 # 1a. Drop the dev "Portable Settings" config: it holds machine-specific module
 # paths and personal state (macros, plugin registry), forces portable mode, and
 # contains a non-ASCII filename that breaks the code seal on the HFS+ DMG.
 # mod-mcp-server is auto-enabled in code (autoEnabledModules()), so the MCP
 # server still starts on a fresh per-user profile.
-rm -rf "$STAGE/Audacity.app/Contents/Portable Settings"
+rm -rf "$STAGE/Otis.app/Contents/Portable Settings"
 
 # 1a-2. AU-only build (configured with -Daudacity_has_vst3=Off -Daudacity_use_vst=Off):
 # remove any stale VST host dylibs an incremental build may have left behind, so
 # no VST3 SDK (GPLv3) code ships. The app binary does not link these.
-rm -f "$STAGE/Audacity.app/Contents/Frameworks/"lib-vst*.dylib
+rm -f "$STAGE/Otis.app/Contents/Frameworks/"lib-vst*.dylib
 
 # NOTE: do NOT `codesign --force --deep` the bundle. It produces a "valid"
 # signature but re-signs the bundled plugin-scanner helper inconsistently, which
@@ -88,16 +88,16 @@ Audacity MCP — 同梱物と使い方
 ================================================================
 
 このディスクには次が入っています。
-  • Audacity.app                         … MCP サーバ内蔵の Audacity（このフォーク）
+  • Otis.app                         … MCP サーバ内蔵の Audacity（このフォーク）
   • MCP Companion フォルダ                … 言葉で Audacity を操作するチャット（Codex 版）
   • 「Audacity と AI チャットを起動.command」… 両方をまとめて起動（おすすめ）
 
 ================================================================
 かんたん起動（おすすめ）
 ================================================================
-  ・先に Audacity.app を Applications にドラッグし、初回だけ下のコマンドで
+  ・先に Otis.app を Applications にドラッグし、初回だけ下のコマンドで
     Gatekeeper を解除しておきます:
-        xattr -dr com.apple.quarantine /Applications/Audacity.app
+        xattr -dr com.apple.quarantine /Applications/Otis.app
   ・あとは「Audacity と AI チャットを起動.command」を右クリック →「開く」。
     Audacity と AI チャットが一緒に立ち上がります（初回は Codex CLI を自動
     取得・約 249MB／ブラウザの「Log in with ChatGPT」でサインイン）。
@@ -107,10 +107,10 @@ Audacity MCP — 同梱物と使い方
 ----------------------------------------------------------------
 1. Audacity をインストール
 ----------------------------------------------------------------
-  1) Audacity.app を、左の「Applications」エイリアスにドラッグします。
+  1) Otis.app を、左の「Applications」エイリアスにドラッグします。
   2) 初回起動: このアプリは未署名のため、Gatekeeper にブロックされます。
      ターミナルで次の 1 行を実行してから起動してください（確実な方法）:
-         xattr -dr com.apple.quarantine /Applications/Audacity.app
+         xattr -dr com.apple.quarantine /Applications/Otis.app
      （「右クリック → 開く」でも開ける場合がありますが、「壊れているため
        開けません」と表示されるときは上のコマンドを使ってください）
   3) 初回起動時はインストール済みプラグインのスキャンと、ようこそ画面が

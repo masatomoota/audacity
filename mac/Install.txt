@@ -1,9 +1,9 @@
-* To install or reinstall Audacity, drag the "Audacity.app" icon in the
+* To install or reinstall Otis, drag the "Otis.app" icon in the
    DMG window to the /Applications folder icon on the right. Alternatively,
-   drag the "Audacity.app" icon to any other location of your choosing. 
+   drag the "Otis.app" icon to any other location of your choosing.
 
-* Do not double-click the "Audacity" icon in the DMG to launch Audacity 
-   from there. 
+* Do not double-click the "Otis" icon in the DMG to launch Otis
+   from there.
    
 * If you still have an "Audacity" installation folder for a version before 
    2.1.3, you will see working duplicates of Audacity's shipped Nyquist
