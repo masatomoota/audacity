@@ -252,7 +252,8 @@ FLAC__StreamDecoderWriteStatus MyFLACFile::write_callback(const FLAC__Frame *fra
                      int24Sample);
          } else {
             auto tmp = ArrayOf<float>{ frame->header.blocksize };
-            float divisor  = static_cast<float>( 1 << (frame->header.bits_per_sample-1) );
+            // Use 1u to avoid signed integer UB when bits_per_sample == 32 (1 << 31)
+            float divisor  = static_cast<float>( 1u << (frame->header.bits_per_sample-1) );
             for (unsigned int s = 0; s < frame->header.blocksize; s++) {
                tmp[s] = static_cast<float>(buffer[chn][s]) / divisor;
             }

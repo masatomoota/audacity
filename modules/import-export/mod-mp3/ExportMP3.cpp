@@ -2020,7 +2020,7 @@ ExportResult MP3ExportProcessor::Process(ExportProcessorDelegate& delegate)
 
       // Write ID3 tag if it was supposed to be at the end of the file
       if (context.id3len > 0) {
-         if (bytes > (int)context.outFile.Write(context.id3buffer.get(), context.id3len)) {
+         if ((int)context.id3len > (int)context.outFile.Write(context.id3buffer.get(), context.id3len)) {
             // TODO: more precise message
             throw ExportErrorException("MP3:1997");
          }

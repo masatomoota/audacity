@@ -571,15 +571,22 @@ bool CLExportProcessor::Initialize(AudacityProject& project,
       wxUint32 dataLen;          // length of all samples in bytes
    } data;
 
+   // WAV RIFF headers use 32-bit length fields.  Cap sampleBytes so the
+   // header fields don't silently wrap for exports longer than ~3.4 hours
+   // at CD quality (stereo float 44.1 kHz).  The audio data is still
+   // piped in full; only the declared lengths in the header are clamped.
+   // riffLen = sizeof(riff) + sizeof(fmt) + sizeof(data) + sampleBytes - 8
+   const unsigned long riffHeaderBytes =
+      sizeof(riff) + sizeof(fmt) + sizeof(data) - 8;  // fixed header overhead in riffLen
+   const unsigned long maxSampleBytes = 0xFFFFFFFFUL - riffHeaderBytes;
+   const unsigned long clampedSampleBytes =
+      (sampleBytes > maxSampleBytes) ? maxSampleBytes : sampleBytes;
+
    riff.riffID[0] = 'R';
    riff.riffID[1] = 'I';
    riff.riffID[2] = 'F';
    riff.riffID[3] = 'F';
-   riff.riffLen   = wxUINT32_SWAP_ON_BE(sizeof(riff) +
-                                        sizeof(fmt) +
-                                        sizeof(data) +
-                                        sampleBytes -
-                                        8);
+   riff.riffLen   = wxUINT32_SWAP_ON_BE(riffHeaderBytes + clampedSampleBytes);
    riff.riffType[0]  = 'W';
    riff.riffType[1]  = 'A';
    riff.riffType[2]  = 'V';
@@ -617,7 +624,7 @@ bool CLExportProcessor::Initialize(AudacityProject& project,
    data.dataID[1] = 'a';
    data.dataID[2] = 't';
    data.dataID[3] = 'a';
-   data.dataLen   = wxUINT32_SWAP_ON_BE(sampleBytes);
+   data.dataLen   = wxUINT32_SWAP_ON_BE(clampedSampleBytes);
 
    // write the headers and metadata
    os->Write(&riff, sizeof(riff));

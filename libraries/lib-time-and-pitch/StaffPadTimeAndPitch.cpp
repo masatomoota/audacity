@@ -37,8 +37,11 @@ int GetFftSize(int sampleRate, bool formantPreservationOn)
    // If needed some time in the future, we can decouple analysis window and
    // FFT sizes by zero-padding, allowing for very fine-grained window duration
    // without compromising performance.
-   return 1 << (formantPreservationOn ? 11 : 12) +
-                  (int)std::round(std::log2(sampleRate / 44100.));
+   // Parentheses required: `+` has higher precedence than `?:`, so without
+   // them the sample-rate scaling term is dropped when formantPreservationOn
+   // is true.
+   return 1 << ((formantPreservationOn ? 11 : 12) +
+                (int)std::round(std::log2(sampleRate / 44100.)));
 }
 
 std::unique_ptr<staffpad::TimeAndPitch> CreateTimeAndPitch(
@@ -123,6 +126,8 @@ void StaffPadTimeAndPitch::GetSamples(float* const* output, size_t outputLen)
          mTimeAndPitch->getNumAvailableOutputSamples();
       while (numOutputSamplesAvailable <= 0)
       {
+         if (IllState())
+            break;
          auto numRequired = mTimeAndPitch->getSamplesToNextHop();
          while (numRequired > 0)
          {

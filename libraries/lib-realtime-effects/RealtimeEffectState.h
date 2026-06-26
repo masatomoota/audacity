@@ -103,7 +103,11 @@ public:
    void SetActive(bool active);
 
    //! Main thread cleans up playback
-   bool Finalize() noexcept;
+   //! @param rtStopped true only when the audio/worker thread is guaranteed
+   //! stopped (the normal playback-stop path).  When false (hot RemoveState /
+   //! ReplaceState during playback) the worker may still touch mWorkerSettings,
+   //! so the worker→main settings copy is skipped to avoid a data race.
+   bool Finalize(bool rtStopped) noexcept;
 
    static const std::string &XMLTag();
    bool HandleXMLTag(

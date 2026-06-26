@@ -137,9 +137,11 @@ void UndoManager::RemoveStates(size_t begin, size_t end)
    TransactionScope trans{mProject, "DiscardingUndoStates"};
 
    for (size_t ii = begin; ii < end; ++ii) {
-      if (current > begin)
+      // Decrement current/saved when the removed slot is at or before them,
+      // so that after the loop they remain within the (shrunk) stack bounds.
+      if (current >= static_cast<int>(begin))
         --current;
-      if (saved > static_cast<int>(begin))
+      if (saved >= static_cast<int>(begin))
         --saved;
 
       RemoveStateAt(begin);

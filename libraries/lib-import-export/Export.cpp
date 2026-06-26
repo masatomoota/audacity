@@ -96,9 +96,11 @@ ExportTask ExportTaskBuilder::Build(AudacityProject& project)
    }
 
    auto processor = mPlugin->CreateProcessor(mFormat);
+   // Use the (possibly temporary) filename so the processor writes to the temp
+   // path; the cleanup lambda then renames it to the original target on success.
    if(!processor->Initialize(project,
       mParameters,
-      mFileName.GetFullPath(),
+      filename.GetFullPath(),
       mT0, mT1, mSelectedOnly,
       mSampleRate, mMixerSpec ? mMixerSpec->GetNumChannels() : mNumChannels,
       mMixerSpec,

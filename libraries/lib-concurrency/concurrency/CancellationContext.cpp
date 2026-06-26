@@ -55,6 +55,17 @@ void CancellationContext::OnCancelled(CancellableWPtr cancellable)
    }
 
    auto lock = std::lock_guard { mCancellableObjectsMutex };
+
+   // Re-check under the lock: Cancel() may have completed between our
+   // initial load above and acquiring mCancellableObjectsMutex.  If so,
+   // Cancel() already drained mCancellableObjects and will never revisit
+   // it, so we must cancel the new item here instead of registering it.
+   if (mCancelled.load(std::memory_order_relaxed))
+   {
+      locked->Cancel();
+      return;
+   }
+
    mCancellableObjects.erase(
       std::remove_if(
          mCancellableObjects.begin(), mCancellableObjects.end(),

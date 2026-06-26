@@ -207,6 +207,11 @@ void OpusImportFileHandle::Import(
          return;
       }
 
+      // OP_HOLE indicates a recoverable gap in the stream. Skip this read
+      // rather than passing a negative sample count downstream.
+      if (samplesPerChannelRead == OP_HOLE)
+         continue;
+
       auto linkChannels = op_head(mOpusFile, linkIndex)->channel_count;
 
       if (linkChannels != mNumChannels)

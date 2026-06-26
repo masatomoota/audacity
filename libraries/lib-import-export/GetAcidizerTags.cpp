@@ -67,8 +67,11 @@ std::optional<LibFileFormats::AcidizerTags> GetAcidizerTags(
       // Another 4 bytes after INFO and IDST that indicates the size of the data
       constexpr auto dataPos = sizeof(INFO) + sizeof(IDST) + 4;
       if (info.datalen < dataPos)
+      {
          // Not the expected data
+         chunkIt = sf_next_chunk_iterator(chunkIt);
          continue;
+      }
       const auto chars = std::make_unique<char[]>(info.datalen);
       info.data = chars.get();
       if (sf_get_chunk_data(chunkIt, &info) != SF_ERR_NO_ERROR)

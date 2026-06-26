@@ -15,10 +15,21 @@
 
 RealtimeEffectList::RealtimeEffectList()
 {
+   // Publish an empty snapshot so Visit() never dereferences a null pointer.
+   std::atomic_store(&mSnapshot, std::make_shared<const States>());
 }
 
 RealtimeEffectList::~RealtimeEffectList()
 {
+}
+
+void RealtimeEffectList::PublishSnapshot()
+{
+   // Must be called with mLock held (or before concurrent access begins).
+   // Builds a new immutable copy of mStates and atomically stores it so that
+   // RT-thread Visit() callers see the update without holding mLock across
+   // their iteration.
+   std::atomic_store(&mSnapshot, std::make_shared<const States>(mStates));
 }
 
 std::unique_ptr<ClientData::Cloneable<>> RealtimeEffectList::Clone() const
@@ -27,6 +38,9 @@ std::unique_ptr<ClientData::Cloneable<>> RealtimeEffectList::Clone() const
    for (auto &pState : mStates)
       result->mStates.push_back(pState->Clone());
    result->SetActive(this->IsActive());
+   // Publish the populated snapshot so Visit() on the clone is immediately
+   // correct (no lock needed; the clone is not yet visible to any RT thread).
+   result->PublishSnapshot();
    return result;
 }
 
@@ -37,6 +51,8 @@ std::unique_ptr<RealtimeEffectList> RealtimeEffectList::Duplicate() const
    for (auto &pState : mStates)
       result->mStates.push_back(pState);
    result->SetActive(this->IsActive());
+   // Publish the populated snapshot (see Clone comment above).
+   result->PublishSnapshot();
    return result;
 }
 
@@ -94,10 +110,11 @@ RealtimeEffectList::AddState(std::shared_ptr<RealtimeEffectState> pState)
 {
    const auto &id = pState->GetID();
    if (pState->GetEffect() != nullptr) {
-      auto shallowCopy = mStates;
-      shallowCopy.emplace_back(pState);
-      // Lock for only a short time
-      (LockGuard{ mLock }, swap(shallowCopy, mStates));
+      {
+         LockGuard guard{ mLock };
+         mStates.emplace_back(pState);
+         PublishSnapshot();
+      }
 
       Publisher<RealtimeEffectListMessage>::Publish({
          RealtimeEffectListMessage::Type::Insert,
@@ -121,18 +138,23 @@ RealtimeEffectList::ReplaceState(size_t index,
       return false;
    const auto &id = pState->GetID();
    if (pState->GetEffect() != nullptr) {
-      auto shallowCopy = mStates;
+      // Capture the old state before we replace it, for the WillReplace
+      // notification (main-thread read of mStates, no lock needed yet).
+      auto oldState = mStates[index];
 
       Publisher<RealtimeEffectListMessage>::Publish({
          RealtimeEffectListMessage::Type::WillReplace,
          index,
          { },
-         shallowCopy[index]
+         oldState
       });
 
-      swap(pState, shallowCopy[index]);
-      // Lock for only a short time
-      (LockGuard{ mLock }, swap(shallowCopy, mStates));
+      {
+         LockGuard guard{ mLock };
+         swap(pState, mStates[index]);
+         PublishSnapshot();
+      }
+      // pState now holds the old state (swapped out above).
 
       Publisher<RealtimeEffectListMessage>::Publish({
          RealtimeEffectListMessage::Type::DidReplace,
@@ -151,20 +173,21 @@ RealtimeEffectList::ReplaceState(size_t index,
 void RealtimeEffectList::RemoveState(
    const std::shared_ptr<RealtimeEffectState> pState)
 {
-   auto shallowCopy = mStates;
-   auto end = shallowCopy.end(),
-      found = std::find(shallowCopy.begin(), end, pState);
+   auto end = mStates.end();
+   auto found = std::find(mStates.begin(), end, pState);
    if (found != end)
    {
-      const auto index = std::distance(shallowCopy.begin(), found);
-      shallowCopy.erase(found);
-
-      // Lock for only a short time
-      (LockGuard{ mLock }, swap(shallowCopy, mStates));
+      const auto index =
+         static_cast<size_t>(std::distance(mStates.begin(), found));
+      {
+         LockGuard guard{ mLock };
+         mStates.erase(mStates.begin() + index);
+         PublishSnapshot();
+      }
 
       Publisher<RealtimeEffectListMessage>::Publish({
          RealtimeEffectListMessage::Type::Remove,
-         static_cast<size_t>(index),
+         index,
          { },
          pState
       });
@@ -173,15 +196,19 @@ void RealtimeEffectList::RemoveState(
 
 void RealtimeEffectList::Clear()
 {
-   decltype(mStates) temp;
+   // Capture the old list so we can send Remove notifications after the atomic
+   // publish, without holding mLock across Observer calls.
+   States old;
+   {
+      LockGuard guard{ mLock };
+      swap(old, mStates);
+      // mStates is now empty; publish the empty snapshot atomically.
+      PublishSnapshot();
+   }
 
-   // Swap an empty list in as a whole, not removing one at a time
-   // Lock for only a short time
-   (LockGuard{ mLock }, swap(temp, mStates));
-
-   for (auto index = temp.size(); index--;)
+   for (auto index = old.size(); index--;)
       Publisher<RealtimeEffectListMessage>::Publish(
-         { RealtimeEffectListMessage::Type::Remove, index, {}, temp[index] });
+         { RealtimeEffectListMessage::Type::Remove, index, {}, old[index] });
 }
 
 std::optional<size_t> RealtimeEffectList::FindState(
@@ -219,24 +246,27 @@ void RealtimeEffectList::MoveEffect(size_t fromIndex, size_t toIndex)
    assert(fromIndex < mStates.size());
    assert(toIndex < mStates.size());
 
-   auto shallowCopy = mStates;
-   if(fromIndex == toIndex)
+   if (fromIndex == toIndex)
       return;
-   if(fromIndex < toIndex)
+
    {
-      const auto first = shallowCopy.begin() + fromIndex;
-      const auto last = shallowCopy.begin() + toIndex + 1;
-      std::rotate(first, first + 1, last);
+      LockGuard guard{ mLock };
+      if (fromIndex < toIndex)
+      {
+         const auto first = mStates.begin() + fromIndex;
+         const auto last  = mStates.begin() + toIndex + 1;
+         std::rotate(first, first + 1, last);
+      }
+      else
+      {
+         const auto first =
+            mStates.rbegin() + (mStates.size() - (fromIndex + 1));
+         const auto last =
+            mStates.rbegin() + (mStates.size() - toIndex);
+         std::rotate(first, first + 1, last);
+      }
+      PublishSnapshot();
    }
-   else
-   {
-      const auto first =
-         shallowCopy.rbegin() + (shallowCopy.size() - (fromIndex + 1));
-      const auto last = shallowCopy.rbegin() + (shallowCopy.size() - toIndex);
-      std::rotate(first, first + 1, last);
-   }
-   // Lock for only a short time
-   (LockGuard{ mLock }, swap(shallowCopy, mStates));
 
    Publisher<RealtimeEffectListMessage>::Publish({
       RealtimeEffectListMessage::Type::Move,
@@ -270,7 +300,14 @@ bool RealtimeEffectList::HandleXMLTag(
 XMLTagHandler *RealtimeEffectList::HandleXMLChild(const std::string_view &tag)
 {
    if (tag == RealtimeEffectState::XMLTag()) {
+      // XML loading runs on the main thread only, before RT threads start.
+      // Still update mSnapshot so the invariant (mSnapshot reflects mStates)
+      // is maintained by the time any Visit() could be called.
       mStates.push_back(RealtimeEffectState::make_shared(PluginID{}));
+      // No concurrent RT access during XML loading; acquire the lock for
+      // correctness and to satisfy PublishSnapshot's contract.
+      LockGuard guard{ mLock };
+      PublishSnapshot();
       return mStates.back().get();
    }
    return nullptr;

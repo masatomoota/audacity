@@ -1004,6 +1004,12 @@ bool AUPImportFileHandle::HandleLabel(XMLTagHandler *&handler)
 
 bool AUPImportFileHandle::HandleWaveClip(XMLTagHandler *&handler)
 {
+   // Guard: waveclip must appear inside a wavetrack or another waveclip.
+   // mHandlers.back() is only valid when the stack is non-empty, and
+   // node.handler must be non-null before we cast and use it.
+   if (mHandlers.empty())
+      return SetError(XO("Internal error in importer...tag not recognized"));
+
    struct node node = mHandlers.back();
 
    if (mParentTag == WaveTrack::WaveTrack_tag)
@@ -1022,14 +1028,21 @@ bool AUPImportFileHandle::HandleWaveClip(XMLTagHandler *&handler)
       handler = waveclip->HandleXMLChild(mCurrentTag);
    }
 
-   mClip = static_cast<WaveClip *>(handler);
-   mClips.push_back(mClip);
+   // Only record the clip when a valid handler was actually created.
+   if (handler)
+   {
+      mClip = static_cast<WaveClip *>(handler);
+      mClips.push_back(mClip);
+   }
 
    return true;
 }
 
 bool AUPImportFileHandle::HandleEnvelope(XMLTagHandler *&handler)
 {
+   if (mHandlers.empty())
+      return SetError(XO("Internal error in importer...tag not recognized"));
+
    struct node node = mHandlers.back();
 
    if (mParentTag == "timetrack")
@@ -1063,6 +1076,9 @@ bool AUPImportFileHandle::HandleEnvelope(XMLTagHandler *&handler)
 
 bool AUPImportFileHandle::HandleControlPoint(XMLTagHandler *&handler)
 {
+   if (mHandlers.empty())
+      return SetError(XO("Internal error in importer...tag not recognized"));
+
    struct node node = mHandlers.back();
 
    if (mParentTag == "envelope")
@@ -1082,6 +1098,9 @@ bool AUPImportFileHandle::HandleControlPoint(XMLTagHandler *&handler)
 
 bool AUPImportFileHandle::HandleSequence(XMLTagHandler *&handler)
 {
+   if (mHandlers.empty())
+      return SetError(XO("Internal error in importer...tag not recognized"));
+
    struct node node = mHandlers.back();
 
    WaveClip *waveclip = static_cast<WaveClip *>(node.handler);
@@ -1094,6 +1113,10 @@ bool AUPImportFileHandle::HandleSequence(XMLTagHandler *&handler)
       HandleWaveClip(dummy);
       waveclip = mClip;
    }
+
+   // Guard against a null handler stored from a malformed parent element.
+   if (!waveclip)
+      return SetError(XO("Internal error in importer...tag not recognized"));
 
    auto pSequence =
       static_cast<Sequence*>(waveclip->HandleXMLChild(Sequence::Sequence_tag));

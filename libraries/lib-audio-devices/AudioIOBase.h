@@ -241,6 +241,15 @@ public:
     */
    static bool IsCaptureRateSupported(int devIndex, long rate);
 
+   /** \brief Invalidate all cached sample-rate data.
+    *
+    * Must be called whenever PortAudio device indices may have changed
+    * (e.g. after Pa_Terminate / Pa_Initialize in DeviceManager::Rescan),
+    * because the caches are keyed by raw integer device indices which
+    * PortAudio does not guarantee to be stable across reinitialisation.
+    */
+   static void InvalidateDeviceCache();
+
    /** \brief Array of common audio sample rates
     *
     * These are the rates we will always support, regardless of hardware support

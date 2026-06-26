@@ -95,7 +95,10 @@ void RealtimeEffectManager::Finalize() noexcept
    // Reenter suspended state
    SetSuspended(true);
 
-   VisitAll([](RealtimeEffectState &state, bool){ state.Finalize(); });
+   // Normal playback-stop path: the audio/worker thread has already been
+   // stopped (WaitForAudioThreadStopped + Pa_CloseStream) before this runs,
+   // so it is safe to fold each state's worker settings back into main.
+   VisitAll([](RealtimeEffectState &state, bool){ state.Finalize(true); });
 
    // Reset processor parameters
    mGroups.clear();
@@ -270,7 +273,9 @@ std::shared_ptr<RealtimeEffectState> RealtimeEffectManager::ReplaceState(
    if (!states.ReplaceState(index, pNewState))
       return nullptr;
    if (mActive)
-      pOldState->Finalize();
+      // Hot replace during playback: the worker thread may still be processing
+      // the old state via a prior snapshot, so do not read its worker settings.
+      pOldState->Finalize(false);
    Publish({
       RealtimeEffectManagerMessage::Type::EffectReplaced, pGroup
    });
@@ -287,7 +292,9 @@ void RealtimeEffectManager::RemoveState(
    // Remove the state from processing (under the lock guard) before finalizing
    states.RemoveState(pState);
    if (mActive)
-      pState->Finalize();
+      // Hot remove during playback: the worker thread may still be processing
+      // this state via a prior snapshot, so do not read its worker settings.
+      pState->Finalize(false);
    Publish({
       RealtimeEffectManagerMessage::Type::EffectRemoved,
       pGroup ? pGroup : MasterGroup

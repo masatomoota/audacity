@@ -260,6 +260,11 @@ void DeviceManager::Rescan()
       // FIXME: TRAP_ERR restarting PortAudio
       Pa_Terminate();
       Pa_Initialize();
+
+      // PortAudio device indices are not stable across Pa_Terminate/Pa_Initialize.
+      // Stale cache entries keyed by old indices would be returned for new devices
+      // that happen to reuse the same integer index, causing wrong sample-rate lists.
+      AudioIOBase::InvalidateDeviceCache();
    }
 
    // FIXME: TRAP_ERR PaErrorCode not handled in ReScan()

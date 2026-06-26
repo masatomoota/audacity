@@ -47,7 +47,11 @@ TransactionScope::~TransactionScope()
 
 bool TransactionScope::Commit()
 {
-   if (mpImpl && !mInTrans) {
+   // No-op when no implementation (factory absent), consistent with ctor
+   if (!mpImpl)
+      return true;
+
+   if (!mInTrans) {
       wxLogMessage("No active transaction to commit");
       // Misuse of this class
       THROW_INCONSISTENCY_EXCEPTION;

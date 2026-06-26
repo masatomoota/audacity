@@ -215,6 +215,11 @@ public:
       if (mInTag)
          EmitStartTag();
 
+      // Guard against malformed streams that emit FT_EndTag without a prior
+      // matching FT_StartTag (which would leave mHandlers empty).
+      if (mHandlers.empty())
+         return;
+
       if (XMLTagHandler* const handler = mHandlers.back())
          handler->HandleXMLEndTag(name);
 
@@ -245,6 +250,10 @@ public:
    {
       if (mInTag)
          EmitStartTag();
+
+      // Guard against malformed streams with FT_Data before any FT_StartTag.
+      if (mHandlers.empty())
+         return;
 
       if (XMLTagHandler* const handler = mHandlers.back())
          handler->HandleXMLContent(CacheString(std::move(value)));
@@ -310,7 +319,8 @@ private:
 
    std::vector<XMLTagHandler*> mHandlers;
 
-   std::string_view mCurrentTagName;
+   // Owned string so that FT_Push/FT_Pop clearing mIds cannot dangle this.
+   std::string mCurrentTagName;
 
    std::deque<std::string> mStringsCache;
    AttributesList mAttributes;
@@ -551,6 +561,10 @@ bool ProjectSerializer::Decode(BufferedStreamReader& in, XMLTagHandler* handler)
 
    auto ReadString = [&mCharSize, &in, &bytes, &stringsCount, &stringsLength](int len) -> std::string
    {
+      // A negative length from a malformed file would convert to a huge
+      // size_t, causing std::bad_alloc which is not caught by catch(Error&).
+      if (len < 0)
+         throw Error{};
       bytes.resize( len );
       auto data = bytes.data();
       in.Read( data, len );
@@ -594,6 +608,9 @@ bool ProjectSerializer::Decode(BufferedStreamReader& in, XMLTagHandler* handler)
 
             case FT_Pop:
             {
+               // Guard against malformed stream with FT_Pop before any FT_Push.
+               if (mIdStack.empty())
+                  throw Error{};
                mIds = mIdStack.back();
                mIdStack.pop_back();
             }

@@ -298,8 +298,9 @@ Connection::operator bool() const noexcept
 Error Connection::Close(bool force) noexcept
 {
    // If there is a transaction in progress,
-   // rollback it.
-   std::vector<Transaction*> pendingTransactions;
+   // rollback it. Take a copy so that Abort() modifying mPendingTransactions
+   // does not invalidate the iterator.
+   std::vector<Transaction*> pendingTransactions = mPendingTransactions;
 
    for (auto* transaction : pendingTransactions)
       if (auto err = transaction->Abort(); !force && err.IsError())

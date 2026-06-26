@@ -462,6 +462,15 @@ bool AudioIOBase::IsCaptureRateSupported(int devIndex, long rate)
    return false;
 }
 
+void AudioIOBase::InvalidateDeviceCache()
+{
+   // Device indices are not stable across Pa_Terminate/Pa_Initialize cycles.
+   // Clear all caches so they are repopulated against the new device list.
+   mCachedPlaybackRates.clear();
+   mCachedCaptureRates.clear();
+   mCachedSampleRates.clear();
+}
+
 std::vector<long> AudioIOBase::GetSupportedPlaybackRates(int devIndex)
 {
    if (devIndex == -1)

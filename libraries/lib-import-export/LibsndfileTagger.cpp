@@ -41,7 +41,8 @@ LibsndfileTagger::LibsndfileTagger(double duration, const std::string& filename)
 
 LibsndfileTagger::~LibsndfileTagger()
 {
-   sf_close(mFile);
+   if (mFile)
+      sf_close(mFile);
 }
 
 LibsndfileTagger::operator bool() const

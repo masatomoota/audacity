@@ -788,11 +788,16 @@ bool ProjectFileIO::CheckVersion()
    else if (version < BaseProjectFormatVersion) {
       using namespace BasicUI;
       wxString currentVersionStr = wxString::Format("%u.%u", BaseProjectFormatVersion.Major, BaseProjectFormatVersion.Minor);
-      bool updateVersion = (MessageBoxResult::Yes == ShowMessageBox(
+      // Informational notice only: the project still opens after this.  The
+      // result was previously captured into an unused `updateVersion` and
+      // compared against MessageBoxResult::Yes, but the default MessageBoxOptions
+      // render a single OK button, so that comparison was always false and dead.
+      // Turning this into an opt-in (Yes/No, abort on No) is a product decision.
+      ShowMessageBox(
          XO("This project was created using an older Audacity version. "
             "Once saved, the project can only be opened with Audacity version %s or newer.").Format(currentVersionStr),
          MessageBoxOptions{}
-            .Caption(XO("Project update required"))));
+            .Caption(XO("Project update required")));
    }
 
    return true;
@@ -1161,7 +1166,18 @@ bool ProjectFileIO::CopyTo(const FilePath &destpath,
       }
 
       // See BEGIN above...
-      sqlite3_exec(db, "COMMIT;", nullptr, nullptr, nullptr);
+      rc = sqlite3_exec(db, "COMMIT;", nullptr, nullptr, nullptr);
+      if (rc != SQLITE_OK)
+      {
+         ADD_EXCEPTION_CONTEXT("sqlite3.rc", std::to_string(rc));
+         ADD_EXCEPTION_CONTEXT("sqlite3.context", "ProjectFileIO::CopyTo::commit");
+
+         SetDBError(
+            XO("Destination project could not be committed")
+         );
+
+         return false;
+      }
    }
 
    // Detach the destination database
@@ -1524,6 +1540,18 @@ void ProjectFileIO::Compact(
             {
                wxLogWarning(wxT("Compaction failed to rename orig %s to back %s"),
                               backName, origName);
+            }
+         }
+
+         // If origName was lost during recovery (rename of backName→origName
+         // failed) but backName still exists, make one last attempt to restore
+         // the original file so that OpenConnection has a valid target.
+         if (!wxFileExists(origName) && wxFileExists(backName))
+         {
+            if (!wxRenameFile(backName, origName))
+            {
+               wxLogWarning(wxT("Compaction failed to restore backup %s to orig %s"),
+                            backName, origName);
             }
          }
 

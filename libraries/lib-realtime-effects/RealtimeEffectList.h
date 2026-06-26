@@ -80,19 +80,31 @@ public:
       // std::function<void(RealtimeEffectState &state, bool listIsActive)> ;
 
    //! Apply the function to all states sequentially.
+   //! Safe to call from the RT audio thread: atomically snapshots the list,
+   //! then iterates without holding any lock across func() invocations.
+   //! No heap allocation on the RT thread (only an atomic refcount increment).
    template<typename StateVisitor>
    void Visit(const StateVisitor &func)
    {
-      for (auto &state : mStates)
-         func(*state, IsActive());
+      // Atomically load the published snapshot.  This bumps the refcount but
+      // performs no heap allocation.  The local shared_ptr keeps the States
+      // buffer alive even if a main-thread mutator concurrently swaps in a new
+      // snapshot.  mLock is NOT held across func() — no priority inversion.
+      const auto snapshot = std::atomic_load(&mSnapshot);
+      if (snapshot)
+         for (auto &state : *snapshot)
+            func(*state, IsActive());
    }
 
    //! Apply the function to all states sequentially.
+   //! See non-const overload for thread-safety notes.
    template<typename StateVisitor>
    void Visit(const StateVisitor &func) const
    {
-      for (const auto &state : mStates)
-         func(*state, IsActive());
+      const auto snapshot = std::atomic_load(&mSnapshot);
+      if (snapshot)
+         for (const auto &state : *snapshot)
+            func(*state, IsActive());
    }
 
    //! Use only in the main thread
@@ -160,7 +172,21 @@ public:
    void SetActive(bool value);
 
 private:
+   //! Main-thread authoritative list.  All named mutators (AddState, etc.) and
+   //! all main-thread readers (GetStateAt, FindState, Clone, WriteXML …) use
+   //! this directly.  Never accessed from the RT thread.
    States mStates;
+
+   //! Atomically published snapshot for the RT audio thread.
+   //! Replaced by every mutator via PublishSnapshot() while holding mLock.
+   //! The RT thread reads it with std::atomic_load (C++17 free function) —
+   //! that is a single pointer-sized atomic load plus a refcount CAS, with no
+   //! heap allocation and no lock held across audio processing.
+   std::shared_ptr<const States> mSnapshot;
+
+   //! Called by every mutator after updating mStates, while mLock is held.
+   //! Publishes a new immutable snapshot so the RT thread sees the change.
+   void PublishSnapshot();
 
    using LockGuard = std::lock_guard<Lock>;
    mutable Lock mLock;

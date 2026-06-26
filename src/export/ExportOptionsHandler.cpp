@@ -158,8 +158,17 @@ void ExportOptionsHandler::PopulateOptions(ShuttleGui& S)
             {
                if((option.flags & ExportOption::TypeMask) == ExportOption::TypeRange)
                {
-                  const int min = *std::get_if<int>(&option.values[0]);
-                  const int max = *std::get_if<int>(&option.values[1]);
+                  // Guard: TypeRange contract requires values == {int min, int max}.
+                  // A malformed third-party plugin could provide fewer entries or
+                  // wrong variant types; skip the option rather than crash.
+                  if(option.values.size() < 2)
+                     continue;
+                  const auto* minPtr = std::get_if<int>(&option.values[0]);
+                  const auto* maxPtr = std::get_if<int>(&option.values[1]);
+                  if(!minPtr || !maxPtr)
+                     continue;
+                  const int min = *minPtr;
+                  const int max = *maxPtr;
                   if(max - min < 20)
                   {
                      control = S.Name(option.title)

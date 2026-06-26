@@ -53,7 +53,8 @@ public:
 
       if (mHandler)
       {
-         CoInitialize(NULL);
+         // Balance the CoInitialize(NULL) call made in SetHandler().
+         CoUninitialize();
       }
    }
 

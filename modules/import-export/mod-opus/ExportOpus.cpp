@@ -733,11 +733,14 @@ bool OpusExportProcessor::Initialize(
    // It is safe to cast to uint16_t here
    context.opus.preskip = uint16_t(calculatedPreskip);
 
-   // Resize the audio packet so it can contain all the raw data.
-   // This is overkill, but should be enough to hold all the data from
-   // the encode float
+   // Resize the audio packet so it can contain all the encoded data.
+   // The Opus spec guarantees at most 1275 bytes per stream per frame.
+   // Use that as a minimum to avoid OPUS_BUFFER_TOO_SMALL for short frames
+   // at low sample rates (e.g. 2.5 ms at 8 kHz gives only 80 bytes otherwise).
    context.ogg.audioStreamPacket.Resize(
-      context.opus.frameSize * sizeof(float) * numChannels);
+      std::max<long>(
+         context.opus.frameSize * long(sizeof(float)) * long(numChannels),
+         context.opus.nbStreams * 1275L));
 
 
    // Try to open the file for writing

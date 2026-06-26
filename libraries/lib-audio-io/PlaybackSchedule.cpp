@@ -328,6 +328,12 @@ void PlaybackSchedule::TimeQueue::Producer(
             {
                mNodePool.emplace_back(std::make_unique<Node>());
                next = mNodePool.back().get();
+               // Mark the newly-allocated node as active so the pool-search
+               // loop (which treats test_and_set returning false as "free")
+               // cannot reclaim it while a future Consumer still holds a
+               // pointer to it via mConsumerNode.  Pool-reused nodes are
+               // already marked active at line 317; new nodes need the same.
+               next->active.test_and_set();
             }
             //previous node had too low capacity to fit all slices,
             //try enlarge capacity to avoid more reallocaitons
@@ -410,7 +416,13 @@ double PlaybackSchedule::TimeQueue::Consumer( size_t nSamples, double rate )
    }
 
    auto head = node->head.load(std::memory_order_acquire);
-   auto tail = node->tail.load(std::memory_order_relaxed);
+   // Pair with the producer's memory_order_release store of tail (line 390)
+   // to establish happens-before for the non-atomic records[].timeValue
+   // writes that precede it.  Although the RingBuffer's acquire-load in
+   // Get() already provides this guarantee for the common callback path,
+   // making the pairing explicit here removes the fragile cross-object
+   // ordering dependency and is correct on weakly-ordered CPUs (ARM64).
+   auto tail = node->tail.load(std::memory_order_acquire);
 
    auto offset = node->offset;
    auto available = TimeQueueGrainSize - offset;
@@ -431,7 +443,9 @@ double PlaybackSchedule::TimeQueue::Consumer( size_t nSamples, double rate )
 
                mConsumerNode = node = next;
                head = 0;
-               tail = node->tail.load(std::memory_order_relaxed);
+               // Acquire pairs with any release store the producer may have
+               // made to this node's tail after the seq_cst next.store().
+               tail = node->tail.load(std::memory_order_acquire);
                available = TimeQueueGrainSize;
             }
             else

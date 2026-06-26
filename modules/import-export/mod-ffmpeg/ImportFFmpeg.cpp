@@ -591,6 +591,10 @@ void FFmpegImportFileHandle::WriteData(StreamContext *sc, const AVPacketWrapper*
    {
       auto data = sc->CodecContext->DecodeAudioPacketInt16(packet);
       const auto channelsCount = sc->CodecContext->GetChannels();
+      // Guard against division by zero: codec may report 0 channels transiently
+      // (e.g. during flush or with malformed input).
+      if (channelsCount <= 0 || data.empty())
+         return;
       const auto samplesPerChannel = data.size() / channelsCount;
 
       unsigned chn = 0;
@@ -613,6 +617,9 @@ void FFmpegImportFileHandle::WriteData(StreamContext *sc, const AVPacketWrapper*
    {
       auto data = sc->CodecContext->DecodeAudioPacketFloat(packet);
       const auto channelsCount = sc->CodecContext->GetChannels();
+      // Guard against division by zero: codec may report 0 channels transiently.
+      if (channelsCount <= 0 || data.empty())
+         return;
       const auto samplesPerChannel = data.size() / channelsCount;
 
       auto channelIndex = 0;

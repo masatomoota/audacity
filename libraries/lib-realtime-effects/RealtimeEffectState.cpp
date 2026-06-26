@@ -697,7 +697,7 @@ void RealtimeEffectState::SetActive(bool active)
       : RealtimeEffectStateChange::EffectOff);
 }
 
-bool RealtimeEffectState::Finalize() noexcept
+bool RealtimeEffectState::Finalize(bool rtStopped) noexcept
 {
    mGroups.clear();
    mCurrentProcessor = 0;
@@ -706,7 +706,14 @@ bool RealtimeEffectState::Finalize() noexcept
    if (!pInstance)
       return false;
 
-   if (!pInstance->UsesMessages()) {
+   // mWorkerSettings is owned by the worker (RT) thread.  Only fold it back
+   // into mMainSettings when the worker is guaranteed stopped (rtStopped).
+   // On the hot RemoveState/ReplaceState paths (rtStopped == false) the worker
+   // may still be processing this state via an older RealtimeEffectList
+   // snapshot, so reading mWorkerSettings here would be a data race on the
+   // contained std::any.  mMainSettings is already current from the last
+   // Access::Flush() in that case.
+   if (rtStopped && !pInstance->UsesMessages()) {
       // This is the main thread cleaning up a state not now used in processing
       mMainSettings = mWorkerSettings;
    }

@@ -1443,7 +1443,10 @@ int FFmpegExporter::EncodeAudio(AVPacketWrapper& pkt, int16_t* audio_samples, in
          mEncAudioCodecCtx->GetWrappedValue(), pkt.GetWrappedValue(),
          frame ? frame->GetWrappedValue() : nullptr, &got_output);
 
-      if (ret == 0)
+      // got_output is set to 1 only when the encoder produced a packet;
+      // when ret==0 but got_output==0 the encoder buffered the input
+      // without emitting output (common for first frames of MP3/AAC/AC-3).
+      if (ret == 0 && got_output)
       {
          WritePacket(pkt);
       }

@@ -282,7 +282,9 @@ public:
    /*! Read by a worker thread but unchanging during playback */
    bool                mbMicroFades;
 
-   double              mSeek;
+   //! Written by the main thread (SeekStream) and read/cleared by the audio
+   //! callback thread; must be atomic to avoid a data race on the seek request.
+   std::atomic<double> mSeek{ 0.0 };
    PlaybackPolicy::Duration mPlaybackRingBufferSecs;
    double              mCaptureRingBufferSecs;
 

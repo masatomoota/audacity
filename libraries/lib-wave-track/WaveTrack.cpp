@@ -617,9 +617,9 @@ bool WaveTrack::LinkConsistencyFix(const bool doFix)
       if (next == nullptr) {
          //next track is absent or not a wave track, fix and report error
          if (doFix) {
-            wxLogWarning(L"Right track %s is expected to be a WaveTrack."
+            wxLogWarning(L"Right track is expected to be a WaveTrack."
                "\n Removing link from left wave track %s.",
-               next->GetName(), GetName());
+               GetName());
             SetLinkType(LinkType::None);
          }
          err = true;

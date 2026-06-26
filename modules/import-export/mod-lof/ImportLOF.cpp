@@ -73,6 +73,9 @@
 #include <wx/textfile.h>
 #include <wx/tokenzr.h>
 
+#include <set>
+#include <string>
+
 #include "FileNames.h"
 #include "WaveTrack.h"
 #include "ImportPlugin.h"
@@ -268,6 +271,12 @@ auto LOFImportFileHandle::GetFileUncompressedBytes() -> ByteCount
    return 0;
 }
 
+// Thread-local set of canonical paths of .lof files currently being imported
+// on the call stack.  Used to detect cycles (a.lof -> b.lof -> a.lof) and
+// to cap nesting depth so the native stack cannot be exhausted.
+static thread_local std::set<std::string> sActiveLOFPaths;
+static const int kMaxLOFNestDepth = 16;
+
 void LOFImportFileHandle::Import(
    ImportProgressListener& progressListener, WaveTrackFactory*,
    TrackHolders& outTracks, Tags*, std::optional<LibFileFormats::AcidizerTags>&)
@@ -283,6 +292,18 @@ void LOFImportFileHandle::Import(
    // to be created, and the undo states are pushed onto the latest project.
    // If a project is created but the first file import into it fails, destroy
    // the project.
+
+   // Register this LOF file's canonical path so that any nested lofOpenFiles()
+   // call can detect a self-reference or cycle before recursing.
+   wxFileName selfFN(mLOFFileName);
+   selfFN.MakeAbsolute();
+   const std::string selfCanon = selfFN.GetFullPath().ToStdString();
+   sActiveLOFPaths.insert(selfCanon);
+   // RAII guard: remove from the active set when Import() returns.
+   struct ActiveGuard {
+      const std::string &key;
+      ~ActiveGuard() { sActiveLOFPaths.erase(key); }
+   } activeGuard{ selfCanon };
 
    outTracks.clear();
 
@@ -426,6 +447,25 @@ void LOFImportFileHandle::lofOpenFiles(wxString* ln)
          fName.Normalize(wxPATH_NORM_ALL, mLOFFileName.GetPath(wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR));
          if(fName.FileExists()) {
             targetfile = fName.GetFullPath();
+         }
+      }
+
+      // Guard against circular or too-deeply nested .lof references.
+      // sActiveLOFPaths holds the canonical paths of all .lof files currently
+      // on the call stack; if targetfile is already there, opening it would
+      // recurse without bound until the native stack is exhausted.
+      {
+         wxFileName targetFN(targetfile);
+         targetFN.MakeAbsolute();
+         const std::string targetCanon = targetFN.GetFullPath().ToStdString();
+
+         if (sActiveLOFPaths.count(targetCanon) ||
+             sActiveLOFPaths.size() >= static_cast<size_t>(kMaxLOFNestDepth))
+         {
+            ImportUtils::ShowMessageBox(
+               /* i18n-hint: You do not need to translate "LOF" */
+               XO("Circular or too-deeply nested LOF file reference was skipped."));
+            return;
          }
       }
 
