@@ -5,7 +5,7 @@
 #
 #   ./scripts/make-dmg.sh
 #
-# Output: build/Audacity-MCP.dmg
+# Output: build/Otis-MCP.dmg
 #
 # This packages an AU-only / GPLv2 build. Configure Audacity beforehand with VST
 # disabled so no VST3 SDK (GPLv3) ships:
@@ -74,23 +74,23 @@ chmod +x "$DEST/セットアップして起動.command" "$DEST/ステム分離�
 
 # 3b. One-click launcher at the DMG root that starts BOTH Audacity and the chat
 # (it just delegates to the companion launcher, which now launches Audacity too).
-LAUNCHER="$STAGE/Audacity と AI チャットを起動.command"
+LAUNCHER="$STAGE/Otis と AI チャットを起動.command"
 cat > "$LAUNCHER" <<'LAUNCH'
 #!/bin/bash
-# Audacity（MCP サーバ内蔵）と AI チャット(MCP Companion) を一緒に起動します。
+# Otis（MCP サーバ内蔵）と AI チャット(MCP Companion) を一緒に起動します。
 exec "$(dirname "$0")/MCP Companion/セットアップして起動.command"
 LAUNCH
 chmod +x "$LAUNCHER"
 
 # 4. Top-level read-me (Japanese)
 cat > "$STAGE/はじめにお読みください.txt" <<'TXT'
-Audacity MCP — 同梱物と使い方
+Otis — 同梱物と使い方
 ================================================================
 
 このディスクには次が入っています。
-  • Otis.app                         … MCP サーバ内蔵の Audacity（このフォーク）
-  • MCP Companion フォルダ                … 言葉で Audacity を操作するチャット（Codex 版）
-  • 「Audacity と AI チャットを起動.command」… 両方をまとめて起動（おすすめ）
+  • Otis.app                          … MCP サーバ内蔵の音声エディタ（Audacity 3.7 ベース）
+  • MCP Companion フォルダ                … 言葉で Otis を操作する AI チャット（Codex 版）
+  • 「Otis と AI チャットを起動.command」    … 両方をまとめて起動（おすすめ）
 
 ================================================================
 かんたん起動（おすすめ）
@@ -98,14 +98,14 @@ Audacity MCP — 同梱物と使い方
   ・先に Otis.app を Applications にドラッグし、初回だけ下のコマンドで
     Gatekeeper を解除しておきます:
         xattr -dr com.apple.quarantine /Applications/Otis.app
-  ・あとは「Audacity と AI チャットを起動.command」を右クリック →「開く」。
-    Audacity と AI チャットが一緒に立ち上がります（初回は Codex CLI を自動
+  ・あとは「Otis と AI チャットを起動.command」を右クリック →「開く」。
+    Otis と AI チャットが一緒に立ち上がります（初回は Codex CLI を自動
     取得・約 249MB／ブラウザの「Log in with ChatGPT」でサインイン）。
 
   以下は個別の手順です。
 
 ----------------------------------------------------------------
-1. Audacity をインストール
+1. Otis をインストール
 ----------------------------------------------------------------
   1) Otis.app を、左の「Applications」エイリアスにドラッグします。
   2) 初回起動: このアプリは未署名のため、Gatekeeper にブロックされます。
@@ -113,8 +113,8 @@ Audacity MCP — 同梱物と使い方
          xattr -dr com.apple.quarantine /Applications/Otis.app
      （「右クリック → 開く」でも開ける場合がありますが、「壊れているため
        開けません」と表示されるときは上のコマンドを使ってください）
-  3) 初回起動時はインストール済みプラグインのスキャンと、ようこそ画面が
-     表示されます。ようこそ画面を閉じ、スキャン完了までお待ちください。
+  3) 初回起動時はインストール済みプラグインのスキャンを行います。
+     完了までしばらくお待ちください。
   4) 起動すると内蔵の MCP サーバが 127.0.0.1:4830 で自動的に立ち上がります。
 
 ----------------------------------------------------------------
@@ -127,11 +127,12 @@ Audacity MCP — 同梱物と使い方
        （約 249MB／2 回目以降は不要）。手動で入れる場合:
          brew install --cask codex
      ・Python 3 が無い場合は開発者ツールの導入を案内します。
-  3) 自動でブラウザが http://127.0.0.1:8765 を開きます。
+  3) Chrome の --app モード（タブ・アドレスバー無しの専用ウィンドウ）で
+     http://127.0.0.1:8765 が自動的に開きます。
   4) 画面右上の「Log in with ChatGPT」で ChatGPT アカウントにサインイン。
      （API キーは不要。会話は端末内に保存され、次回も続きから使えます）
   5)「440Hz のトーンを 3 秒作って半分の音量にして書き出して」のように
-     話しかけると、Audacity が動きます。
+     話しかけると、Otis が動きます。
 
 ----------------------------------------------------------------
 3. ステム分離・文字起こし（音声AI・任意）
@@ -146,13 +147,22 @@ Audacity MCP — 同梱物と使い方
     （端末内で処理・APIキー不要）。
 
 ----------------------------------------------------------------
+4. 対応フォーマット
+----------------------------------------------------------------
+  ・ffmpeg 不要で対応: WAV / AIFF / MP3 / FLAC / OGG Vorbis / Opus
+  ・M4A / AAC / WMA / AC3 を扱いたい場合は Homebrew で ffmpeg を追加:
+        brew install ffmpeg
+    （ライセンス・配布サイズの観点から、ffmpeg は DMG に同梱していません）
+
+----------------------------------------------------------------
 動作要件・注意
 ----------------------------------------------------------------
   • Apple Silicon (arm64) の Mac 専用です。
   • このディスクは未署名（Apple の公証なし）です。配布元を信頼できる
     場合のみ、上記の方法で開いてください。
-  • "Audacity" は Muse Group の登録商標です。広く再配布する場合は名称・
-    アイコンのリブランドが必要です。
+  • Otis は Audacity 3.7 のフォークです。"Audacity" は Muse Group の
+    登録商標であり、Otis は Audacity プロジェクトと提携・公認の関係に
+    はありません。
   • プラグイン対応: AU（Audio Unit）のみ。VST/VST3 は無効化しています。
     VST3 SDK（GPLv3）を含まないため、本ビルドは GPLv2-or-later で配布可能です
     （同梱「LICENSE (GPLv2).txt」）。GPL の義務に基づきソースは元リポジトリで

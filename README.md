@@ -65,7 +65,8 @@ LLM がオーディオを**数値で判断**できるよう、独自の分析コ
 - マルチトラック編集、32-bit float 処理
 - 35+ のビルトインエフェクト ＋ Audio Unit プラグイン対応
 - あらゆるオーディオデバイスからの録音
-- WAV / MP3 / FLAC / OGG / Opus 等の入出力（FFmpeg 拡張可）
+- **WAV / AIFF / MP3 / FLAC / OGG Vorbis / Opus** を標準対応（ffmpeg 不要）
+- M4A / AAC / WMA / AC3 等は `brew install ffmpeg` で追加対応（DMG には ffmpeg を同梱しません — ライセンスと配布サイズの観点から）
 - Nyquist / スクリプティングによる自動化
 
 ### 🖥️ UI の改善（Audacity からの差分）
@@ -114,15 +115,15 @@ LLM がオーディオを**数値で判断**できるよう、独自の分析コ
 
 ### ビルド済み DMG を使う場合
 
-1. [Releases](https://github.com/masatomoota/audacity/releases) から `.dmg` をダウンロード
-2. `Audacity.app` を `/Applications` にドラッグ
-3. 初回のみ Gatekeeper を解除：
+1. [Releases](https://github.com/masatomoota/audacity/releases) から `Otis-MCP.dmg` をダウンロード（リリース準備中）
+2. DMG をマウントし、`Otis.app` を `/Applications` にドラッグ
+3. 初回のみ Gatekeeper を解除（DMG は未署名・公証なしのため）：
    ```bash
-   xattr -dr com.apple.quarantine /Applications/Audacity.app
+   xattr -dr com.apple.quarantine /Applications/Otis.app
    ```
-4. DMG 内の「**Audacity と AI チャットを起動.command**」をダブルクリック
-   - Otis が起動し、チャット UI がブラウザに開きます
-5. 初回のみ ChatGPT にログイン（UIの「ChatGPT でログイン」ボタン、または事前に `codex login`）
+4. DMG 内の「**Otis と AI チャットを起動.command**」をダブルクリック
+   - Otis（エディタ本体）と AI チャットコンパニオンが一緒に起動し、Chrome の `--app` モード（タブやアドレスバーのない専用ウィンドウ）でチャット UI が開きます
+5. 初回のみ ChatGPT にログイン（UI の「ChatGPT でログイン」ボタン、または事前に `codex login`）
 
 ### ソースからビルドする場合
 
@@ -176,7 +177,7 @@ cd mcp-companion
 
 ```bash
 ./scripts/make-dmg.sh
-# → build/Audacity-MCP.dmg
+# → build/Otis-MCP.dmg
 ```
 
 ---
@@ -276,6 +277,7 @@ python3 -m venv ~/.audacity-mcp-companion/sep-venv
 | [`MCP_PHASE0_IMPLEMENTATION_HANDOFF.md`](MCP_PHASE0_IMPLEMENTATION_HANDOFF.md) | Phase 0 実装完了（MCP サーバ・知覚コマンド・コンパニオン） |
 | [`MCP_SESSION2_HANDOFF.md`](MCP_SESSION2_HANDOFF.md) | UI 修正・Codex 再構築・ステム分離・DMG 配布 |
 | [`MCP_SESSION3_HANDOFF.md`](MCP_SESSION3_HANDOFF.md) | C++ コアのバグ監査（32 ファイル・30+ 件の修正） |
+| [`MCP_SESSION4_HANDOFF.md`](MCP_SESSION4_HANDOFF.md) | Otis リブランド・チャットからの実機検証・IME/Chrome --app/ステム検証 |
 | [`BUILD_HANDOFF.md`](BUILD_HANDOFF.md) | ビルド・パッケージの完全再現手順 |
 | [`OTIS_REBRAND_HANDOFF.md`](OTIS_REBRAND_HANDOFF.md) | Otis へのリブランド実装ガイド |
 | [`OTIS_UI_COLOR_HANDOFF.md`](OTIS_UI_COLOR_HANDOFF.md) | UI アクセントカラーの設計 |
