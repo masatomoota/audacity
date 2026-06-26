@@ -10,6 +10,7 @@
 #include "../toolbars/ToolManager.h"
 #include "AudacityMessageBox.h"
 #include "AudioIO.h"
+#include "BasicUI.h"
 #include "CommandContext.h"
 #include "CommandManager.h"
 #include "EffectManager.h"
@@ -207,6 +208,14 @@ void OnBenchmark(const CommandContext &context)
    CommandManager::Get(project).RegisterLastTool(context);  //Register Run Benchmark as Last Tool
    auto &window = GetProjectFrame( project );
    ::RunBenchmark( &window, project);
+}
+
+// Otis: open the MCP chat companion (local web UI on 127.0.0.1:8765) in the
+// default browser. The companion server must be running (it normally is when
+// launched via the Otis + AI chat launcher).
+void OnOpenChat(const CommandContext &)
+{
+   BasicUI::OpenInDefaultBrowser(wxT("http://127.0.0.1:8765"));
 }
 
 void OnSimulateRecordingErrors(const CommandContext &context)
@@ -478,6 +487,11 @@ auto ToolsMenu()
 {
    static auto menu = std::shared_ptr{
    Menu( wxT("Tools"), XXO("T&ools"),
+      Section( "OtisChat",
+         Command( wxT("OpenChat"),
+            Verbatim( wxString::FromUTF8("\343\203\201\343\203\243\343\203\203\343\203\210\343\202\222\351\226\213\343\201\217") ), // "チャットを開く"
+            OnOpenChat, AlwaysEnabledFlag )
+      ),
       Section( "Manage",
          Command( wxT("ManageTools"), XXO("Plugin Manager"),
             OnManageTools, AudioIONotBusyFlag() )
