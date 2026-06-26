@@ -45,13 +45,16 @@ fi
 if mcp_up; then
   say "Audacity は既に起動しています。"
 else
+  # Otis.app 探索順: DMG 同梱の隣 → インストール済み → 開発ビルド → 旧名(Audacity.app)
+  # への後方互換。バックスラッシュ継続行の末尾には絶対にコメントを置かない
+  # (bash がコメントを継続行より優先するため、for ループが途中で切れる)。
   AUD=""
   for cand in \
-    "../Otis.app" \                              # DMG: 「MCP Companion」の隣
-    "/Applications/Otis.app" \                   # インストール済み
+    "../Otis.app" \
+    "/Applications/Otis.app" \
     "$HOME/Applications/Otis.app" \
-    "../build/RelWithDebInfo/Otis.app" \         # 開発リポジトリ
-    "../Audacity.app" \                          # 後方互換（旧名）
+    "../build/RelWithDebInfo/Otis.app" \
+    "../Audacity.app" \
     "/Applications/Audacity.app" \
     "../build/RelWithDebInfo/Audacity.app"; do
     if [ -d "$cand" ]; then AUD="$cand"; break; fi
