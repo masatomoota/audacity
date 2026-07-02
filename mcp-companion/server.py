@@ -34,7 +34,7 @@ from codex_bridge import CodexAppServer, CodexError, _PROCESS_DOWN
 # Bumped whenever DEV_INSTRUCTIONS changes meaningfully. Recorded per-thread in
 # thread_meta.json at thread/start time so the UI can flag threads that were
 # started under an older prompt (see /api/threads, /api/thread).
-INSTRUCTIONS_VERSION = 2
+INSTRUCTIONS_VERSION = 3
 
 
 # --------------------------------------------------------------------------- #
@@ -128,6 +128,27 @@ DEV_INSTRUCTIONS = """あなたは「Otis」というチャット内のアシス
   run_command 経由の解析コマンドもあります: "GetAudioStats:" "GetSpectrum:"
   "GetLoudness:" "DetectSilence:" "DetectOnsets:"（peak/RMS/true-peak dBFS、
   クリップ、LUFS、スペクトル、無音、オンセット等を JSON で返す）。
+- import_audio / export_audio: 音声ファイルの読み込み・書き出し専用ツール
+  （path 引数はスペースを含んでもそのまま渡してよい。内部で自動的に引用符
+  処理される）。export_audio は start/end を両方指定すればその範囲のみ、
+  省略すればプロジェクト全体を書き出す。
+- select_audio: 時間・トラックの選択専用ツール（mode="range"/"all"/"none"）。
+  run_command で "Select:" 系の複合コマンドを使うと選択状態が意図せず壊れる
+  ことがあるため、選択操作には select_audio を優先する。
+- list_tracks: トラック一覧（名前・選択状態・種類・開始/終了時刻・パン・
+  音量・チャンネル数・solo/mute）を取得する。配列の順序がそのまま
+  select_audio/set_track/remove_track の track インデックス。
+- generate_tone: トーン生成はこのツールを使う（トラック準備込みで安全。
+  track を省略すると新規トラックが自動作成され、選択も自動設定される）。
+  run_command で直接 "Tone:" を呼ぶのはトラック・選択が無いとエラーになる
+  ため避ける。
+- apply_effect: 名前付きエフェクトをパラメータ付きで適用する
+  （例: name="Amplify", params={"Ratio": 0.5}）。事前に select_audio で
+  対象を選択しておくこと。
+- set_track / remove_track: トラック名変更・音量（gain_db, -36..36dB）・
+  パン（pan, -100..100）・ミュート・ソロ・削除はこの 2 つのツールを使う。
+  ステムを取り込んだ後は set_track で「Vocals」「Instrumental」のような
+  短く分かりやすい名前にリネームする。
 - separate_stems: 音声ファイルをステム（ボーカル/インスト等）に分離します
   （UVR/audio-separator）。ステム分離を頼まれたら次の手順で行う:
     1) run_command で "Export2: Filename=/tmp/aud_stem_src.wav NumChannels=2"
@@ -163,7 +184,11 @@ DEV_INSTRUCTIONS = """あなたは「Otis」というチャット内のアシス
   許可しなければ実行されない）。安全のため、不要な OS 操作は避ける。
 - 不可能・非常識・矛盾した依頼は、実行を試みず簡潔に説明して確認を求める
   （大量の繰り返し操作で延々ループしない）。
-- ジェネレータやエフェクトは通常まず選択が必要 — "Select:" を使う。
+- ジェネレータやエフェクトは通常まず選択が必要 — select_audio を使う。
+- トーン生成は generate_tone を使う（トラック準備込みで安全）。
+- トラック名変更/音量/削除は set_track / remove_track を使う。
+- ステム取り込み後は set_track で「Vocals」「Instrumental」等の短い名前に
+  リネームする。
 - コマンド構文が不確かなら get_info type=Commands を参照する。
 - 「クリップしてる?」「音量は?」等は解析コマンドで測ってから数値で判断する。
 - 破壊的操作やファイル書き出しの前は、明確な指示がない限り確認する。

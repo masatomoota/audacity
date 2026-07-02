@@ -165,6 +165,23 @@ curl -s -X POST http://127.0.0.1:4830/mcp \
 # → {"jsonrpc":"2.0","id":1,"result":{}}
 ```
 
+#### MCP ツール一覧
+
+`tools/list` は以下の 10 個のツールを返します。頻出操作には専用ツール（2〜9）を使い、それ以外の操作にのみ `run_command` を使うことを推奨します。
+
+| ツール | 用途 |
+|---|---|
+| `run_command` | 任意の Audacity スクリプトコマンドを実行（専用ツールにない操作用） |
+| `get_info` | `GetInfo` コマンドでトラック・クリップ・ラベル等のメタデータを取得 |
+| `import_audio` | 音声ファイルを新規トラックとしてインポート |
+| `export_audio` | 音声を書き出し（`start`/`end` を両方指定するとその範囲のみ） |
+| `select_audio` | 時間・トラックの選択（`mode`: `range`/`all`/`none`） |
+| `list_tracks` | トラック一覧を取得（配列順が `track` インデックスに対応） |
+| `generate_tone` | トーン生成（トラック・選択の準備込みで安全。`track` 省略時は新規トラック作成） |
+| `apply_effect` | 名前付きエフェクトをパラメータ付きで適用（事前に `select_audio` で対象を選択） |
+| `set_track` | トラック名・音量（dB）・パン・ミュート・ソロを変更 |
+| `remove_track` | トラックを削除 |
+
 #### チャットコンパニオンの起動
 
 ```bash

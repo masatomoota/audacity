@@ -26,6 +26,7 @@
 #include <memory>
 #include <mutex>
 #include <chrono>
+#include <vector>
 
 // Forward-declare the httplib Server to avoid pulling the full header here.
 namespace httplib { class Server; }
@@ -82,6 +83,19 @@ private:
    // not complete within the timeout.
    // Must NOT be called from the wx main/GUI thread.
    std::string ExecCommand(const std::string &cmd);
+
+   // Run a sequence of Audacity commands, in order, via ExecCommand.  Stops
+   // at the first failing step (per ResponseIsFailed) and returns a result
+   // describing which step/command failed and the relay's response for it.
+   // On success returns the response text of the LAST step (the one whose
+   // result is most relevant to the caller).  Used by the multi-step
+   // convenience tools (import_audio, export_audio, generate_tone, ...) to
+   // share the same "content"/"isError" MCP result shape as run_command.
+   // Throws std::runtime_error if any ExecCommand() call throws (relay
+   // error) — caller is expected to catch this the same way it does for a
+   // single ExecCommand call.
+   std::string RunCommandSequence(const std::vector<std::string> &commands,
+                                  bool *outFailed);
 
    // JSON-RPC dispatch helpers — each returns a JSON value (as std::string).
    std::string HandleInitialize(const std::string &id);
