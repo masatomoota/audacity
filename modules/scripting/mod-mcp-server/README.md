@@ -4,4 +4,4 @@
 
 **Phase-0 tools exposed:** `run_command` (proxies any Audacity command string) and `get_info` (wraps the built-in `GetInfo` command).
 
-**Vendored dependencies required before building:** place `httplib.h` (cpp-httplib) in `lib/cpp-httplib/` and `json.hpp` (nlohmann/json) in `lib/nlohmann-json/` inside this module directory, then add `mod-mcp-server` to the `MODULES` list in `modules/scripting/CMakeLists.txt`.
+**Vendored dependencies:** `httplib.h` (cpp-httplib) and `json.hpp` (nlohmann/json) are already vendored under `lib/cpp-httplib/` and `lib/nlohmann-json/` inside this module directory, and `CMakeLists.txt` adds both to the include path and builds them in — no manual setup is required. Ensure `mod-mcp-server` is listed in the `MODULES` list in `modules/scripting/CMakeLists.txt`.

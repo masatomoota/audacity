@@ -25,6 +25,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <chrono>
 
 // Forward-declare the httplib Server to avoid pulling the full header here.
 namespace httplib { class Server; }
@@ -75,7 +76,10 @@ public:
 
 private:
    // Execute an Audacity command string via the stored relay pointer.
-   // Blocks until the main thread has processed the command.
+   // Waits (with a bounded timeout) for the main thread to process the
+   // command.  Throws std::runtime_error if a previous command is still in
+   // flight (e.g. a modal dialog is blocking Otis) or if this command does
+   // not complete within the timeout.
    // Must NOT be called from the wx main/GUI thread.
    std::string ExecCommand(const std::string &cmd);
 
@@ -97,7 +101,8 @@ private:
 
    std::unique_ptr<httplib::Server> mServer;
    tpMcpExecFunc mExecFn { nullptr };
-   std::mutex mExecMutex;   // serialize relay calls (single-command contract)
+   std::timed_mutex mExecMutex;   // serialize relay calls (single-command contract)
+   std::atomic<bool> mStopRequested { false };
 };
 
 #endif /* End of include guard: __MCP_HTTP_SERVER__ */

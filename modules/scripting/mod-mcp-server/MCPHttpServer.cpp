@@ -8,12 +8,22 @@
 
   Transport contract (mirrors PipeServer.cpp / DoSrv / DoSrvMore):
     - One Audacity command per HTTP request (command string in JSON field).
-    - Call (*mExecFn)(&wxIn, &wxOut) from the httplib worker thread.
+    - Call (*mExecFn)(&wxIn, &wxOut) from a detached relay thread.
       This blocks synchronously until the wx main thread processes the
       AppCommandEvent and calls Flush() on the ResponseTarget semaphore.
     - The response is accumulated in wxOut.  Because mExecFn is the same
       ExecFromWorker pointer the pipe transport uses, the threading model
       is identical.
+
+  Relay timeout (critical — see ExecCommand):
+    mExecFn can block indefinitely (e.g. a modal dialog is waiting for a
+    human).  If the httplib worker thread called it synchronously and held
+    mExecMutex the whole time, one wedged command would starve every future
+    HTTP request forever.  Instead ExecCommand hands the relay call off to a
+    detached std::thread that owns the (already-acquired) mutex lock for its
+    lifetime, and the HTTP thread waits on a std::future with a bounded
+    timeout.  If the previous relay call is still in flight, a subsequent
+    ExecCommand fails fast (try_lock_for) rather than queuing forever.
 
   Thread-safety note:
     DoSrv / DoSrvMore in ScripterCallback.cpp use module-level globals
@@ -22,8 +32,7 @@
     goes through CommandBuilder + ResponseTarget and is safe from any
     non-GUI thread.  Access to mExecFn itself is serialised by the fact
     that SetExecFunc is called before Start() and never mutated after.
-    If concurrent HTTP requests are ever needed, wrap the mExecFn call
-    in a std::mutex.
+    Concurrent relay calls are serialised via mExecMutex (see ExecCommand).
 
 **********************************************************************/
 
@@ -39,6 +48,10 @@
 #include <cassert>
 #include <string>
 #include <stdexcept>
+#include <thread>
+#include <future>
+#include <chrono>
+#include <memory>
 
 using json = nlohmann::json;
 
@@ -53,18 +66,46 @@ std::string IdToString(const json &j)
 {
    if (!j.contains("id") || j["id"].is_null())
       return "null";
-   if (j["id"].is_string())
-      return "\"" + j["id"].get<std::string>() + "\"";
-   // numeric id — return bare number
+   // dump() already produces a properly quoted/escaped JSON token for both
+   // string and numeric ids.
    return j["id"].dump();
+}
+
+/// Trim leading/trailing ASCII whitespace (mirrors what CommandBuilder emits
+/// around empty/blank responses).
+std::string Trim(const std::string &s)
+{
+   const char *ws = " \t\r\n";
+   auto start = s.find_first_not_of(ws);
+   if (start == std::string::npos)
+      return "";
+   auto end = s.find_last_not_of(ws);
+   return s.substr(start, end - start + 1);
 }
 
 /// True when the Audacity relay response indicates command failure.
 bool ResponseIsFailed(const std::string &response)
 {
-   return response.find("finished: Failed!") != std::string::npos
-       || response.find("BatchCommand finished: Failed") != std::string::npos;
+   std::string trimmed = Trim(response);
+   return trimmed.empty()
+       || response.find("finished: Failed!") != std::string::npos
+       || response.find("BatchCommand finished: Failed") != std::string::npos
+       || response.find("Syntax error") != std::string::npos
+       || response.find("Unrecognized parameter") != std::string::npos
+       || response.find("Parameter string is missing") != std::string::npos
+       || response.find("Invalid value for parameter") != std::string::npos;
 }
+
+/// Bundles the in/out strings and completion signal for a single relay call
+/// that runs on a detached thread.  Held via shared_ptr so that a timed-out
+/// ExecCommand() can walk away while the relay thread is still writing into
+/// it without triggering a use-after-free.
+struct RelayJob
+{
+   wxString in;
+   wxString out;
+   std::promise<void> done;
+};
 
 } // anonymous namespace
 
@@ -95,21 +136,45 @@ std::string MCPHttpServer::ExecCommand(const std::string &cmd)
 
    // httplib dispatches requests on multiple worker threads; the relay honors a
    // single-command-at-a-time contract (inherited from the pipe transport), so
-   // serialize all relay calls.
-   std::lock_guard<std::mutex> lock(mExecMutex);
+   // serialize all relay calls.  Fail fast instead of blocking forever if a
+   // previous command is still stuck (e.g. a modal dialog is waiting on a
+   // human) — otherwise every httplib worker thread would eventually wedge
+   // on this mutex and the whole MCP server would appear dead.
+   std::unique_lock<std::timed_mutex> lock(mExecMutex, std::defer_lock);
+   if (!lock.try_lock_for(std::chrono::seconds(5))) {
+      throw std::runtime_error(
+         "Previous command still executing — Otis may be showing a modal "
+         "dialog that needs human attention. Retry later.");
+   }
 
-   // The relay expects wxString by pointer.
-   wxString wxIn  = wxString::FromUTF8(cmd.c_str(), cmd.size());
-   wxString wxOut;
+   // Run the actual relay call on a detached thread that owns the lock for
+   // its lifetime.  If the relay call itself hangs, this ExecCommand() call
+   // still returns (via the future timeout below) and the lock is only
+   // released when the relay call eventually completes — so the fail-fast
+   // above is what keeps subsequent requests unblocked.
+   auto job = std::make_shared<RelayJob>();
+   job->in = wxString::FromUTF8(cmd.c_str(), cmd.size());
+   std::future<void> future = job->done.get_future();
 
-   // This call BLOCKS until the wx main thread processes the AppCommandEvent
-   // and posts the wxSemaphore in ResponseTarget::Flush().
-   (*mExecFn)(&wxIn, &wxOut);
+   std::thread([job, fn = mExecFn, lk = std::move(lock)]() mutable {
+      // This call BLOCKS until the wx main thread processes the
+      // AppCommandEvent and posts the wxSemaphore in ResponseTarget::Flush().
+      (*fn)(&job->in, &job->out);
+      job->done.set_value();
+      // lk (and therefore mExecMutex) is released here, when the thread
+      // object is destroyed at the end of this lambda.
+   }).detach();
+
+   if (future.wait_for(std::chrono::seconds(300)) == std::future_status::timeout) {
+      throw std::runtime_error(
+         "Command timed out after 300s (a modal dialog may be blocking "
+         "Otis). The command may still complete in the background.");
+   }
 
    // Convert response back to UTF-8 std::string.
    // ToStdString(wxConvUTF8) avoids potential ambiguity in std::string
    // constructor overload resolution with wxScopedCharBuffer.
-   return wxOut.ToStdString(wxConvUTF8);
+   return job->out.ToStdString(wxConvUTF8);
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +209,11 @@ std::string MCPHttpServer::HandleToolsList(const std::string &id)
          {"description",
             "Execute an arbitrary Audacity scripting command and return its "
             "response.  The command string follows Audacity's macro syntax: "
-            "'CommandName: param1=val1 param2=val2'."},
+            "'CommandName: param1=val1 param2=val2'.  Values containing "
+            "spaces MUST be double-quoted, e.g. Import2: "
+            "Filename=\\\"/path with spaces/x.wav\\\".  Export2 exports the "
+            "current time selection, or the whole project when nothing is "
+            "selected."},
          {"inputSchema", {
             {"type", "object"},
             {"properties", {
@@ -201,6 +270,11 @@ std::string MCPHttpServer::HandleToolsCall(const std::string &id,
                        std::string("Invalid arguments JSON: ") + e.what());
    }
 
+   if (!args.is_object()) {
+      return MakeError(id, -32602,
+                       "tools/call arguments must be a JSON object");
+   }
+
    std::string command;
 
    if (toolName == "run_command") {
@@ -231,19 +305,27 @@ std::string MCPHttpServer::HandleToolsCall(const std::string &id,
 
    bool failed = ResponseIsFailed(response);
 
+   // Give the LLM a concrete hint when the relay returned nothing — this
+   // typically means there is no active project window to run commands
+   // against, rather than a genuine command failure.
+   std::string displayText = response;
+   if (Trim(response).empty()) {
+      displayText = "Empty response from Otis — is a project window open?";
+   }
+
    // Build an MCP tools/call result payload.
    json result = {
       {"content", json::array({
          {
             {"type", "text"},
-            {"text", response}
+            {"text", displayText}
          }
       })},
       {"isError", failed}
    };
 
    if (failed) {
-      result["_meta"] = {{"errorMessage", response}};
+      result["_meta"] = {{"errorMessage", displayText}};
    }
 
    return MakeResult(id, result.dump());
@@ -369,16 +451,27 @@ void MCPHttpServer::Start(int port)
       }
    });
 
+   // If Stop() was already requested (e.g. shutdown raced us before we got
+   // here), don't start listening at all — otherwise we could enter the
+   // blocking listen() loop just after the shutdown signal was sent, and
+   // nothing would ever call Stop() again to unblock it.
+   if (mStopRequested.load(std::memory_order_acquire))
+      return;
+
    // Bind strictly to localhost — no external access.
    if (!mServer->listen("127.0.0.1", port)) {
       // listen() returns false if the port is already in use or another error
-      // occurs.  Log to stderr; StartScriptServer will retry via its while(true).
+      // occurs.  Log to stderr, then sleep before returning so the
+      // while(true) in StartScriptServer's caller doesn't busy-spin retrying
+      // the bind immediately.
       fprintf(stderr,
               "mod-mcp-server: failed to listen on 127.0.0.1:%d\n", port);
+      std::this_thread::sleep_for(std::chrono::seconds(3));
    }
 }
 
 void MCPHttpServer::Stop()
 {
+   mStopRequested.store(true, std::memory_order_release);
    mServer->stop();
 }
