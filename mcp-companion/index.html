@@ -41,6 +41,11 @@
   .thread:hover { background: var(--panel2); color: var(--text); }
   .thread.active { background: var(--panel2); color: var(--text); }
   .thread .t-title { color: var(--text); }
+  .thread .t-old {
+    display: inline-block; margin-left: 6px; padding: 1px 5px; border-radius: 4px;
+    background: var(--panel2); border: 1px solid var(--warn); color: var(--warn); font-size: 10px;
+    vertical-align: middle;
+  }
   .thread small { display: block; color: var(--muted); font-size: 11px; }
   #sidefoot { border-top: 1px solid var(--border); padding: 10px 12px; font-size: 12px; color: var(--muted); }
   /* ---- main ---- */
@@ -74,6 +79,10 @@
   .bubble .who { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
   .bubble .body { white-space: pre-wrap; word-wrap: break-word; }
   .reasoning { color: var(--muted); font-style: italic; font-size: 13px; white-space: pre-wrap; margin-bottom: 6px; }
+  .stale-banner {
+    background: #2a1d12; border: 1px solid var(--warn); border-radius: 8px; color: var(--warn);
+    font-size: 13px; padding: 8px 12px; margin: 0 0 14px;
+  }
   .tool {
     background: var(--tool); border: 1px solid var(--border); border-radius: 8px; margin: 8px 0;
     overflow: hidden; font-size: 13px;
@@ -227,18 +236,27 @@ function addReasoning(t) {
   }
   m._reason.textContent += t; scrollDown();
 }
+let toolCardSeq = 0;
 function toolCard(d, running) {
   const m = ensureAssistant();
-  const key = d.id || "t";
-  let el = m._bubble.querySelector('.tool[data-id="' + cssEsc(key) + '"]');
+  let el = null;
+  if (d.id) {
+    el = m._bubble.querySelector('.tool[data-id="' + cssEsc(d.id) + '"]');
+  } else if (!running) {
+    // id 欠落時 (tool_end): 最後に open 状態の tool カードを更新する
+    const open = m._bubble.querySelectorAll('.tool[data-open="1"]');
+    if (open.length) el = open[open.length - 1];
+  }
   if (!el) {
+    const key = d.id || ("t" + (++toolCardSeq));
     el = document.createElement("details");
-    el.className = "tool"; el.dataset.id = key; el.open = false;
+    el.className = "tool"; el.dataset.id = key; el.dataset.open = "1"; el.open = false;
     el.innerHTML = `<summary><span class="st"></span>
       <code></code><span class="args"></span></summary><div class="tbody"></div>`;
     el.querySelector("code").textContent = (d.server || "audacity") + " · " + (d.tool || "");
     m._bubble.appendChild(el);
   }
+  if (!running) el.dataset.open = "0";
   el.querySelector(".args").textContent = d.arguments ? JSON.stringify(d.arguments) : "";
   const st = el.querySelector(".st");
   const tb = el.querySelector(".tbody");
@@ -309,16 +327,32 @@ async function loadThreads() {
   try {
     const r = await fetch("/api/threads"); const d = await r.json();
     const box = $("#threads"); box.innerHTML = "";
+    const hasVersionInfo = d.currentInstructionsVersion !== undefined && d.currentInstructionsVersion !== null;
     (d.threads || []).forEach(t => {
       const el = document.createElement("div");
       el.className = "thread" + (t.id === threadId ? " active" : "");
       const title = document.createElement("span"); title.className = "t-title"; title.textContent = t.title || "無題";
       el.appendChild(title);
+      if (hasVersionInfo && t.instructionsVersion !== d.currentInstructionsVersion) {
+        const badge = document.createElement("span"); badge.className = "t-old"; badge.textContent = "旧";
+        badge.title = "このスレッドは古い指示で動作します。新規チャット推奨";
+        el.appendChild(badge);
+      }
       if (t.updatedAt) { const s = document.createElement("small"); s.textContent = new Date(t.updatedAt*1000).toLocaleString(); el.appendChild(s); }
       el.onclick = () => openThread(t.id);
       box.appendChild(el);
     });
   } catch (e) { /* ignore */ }
+}
+
+function showLoadError(id) {
+  clearChat();
+  const div = document.createElement("div");
+  div.className = "empty";
+  div.innerHTML = `<h2>スレッドの読み込みに失敗しました</h2>
+    <div class="examples"><button id="retry-load">再試行</button></div>`;
+  chatInner.appendChild(div);
+  div.querySelector("#retry-load").onclick = () => openThread(id);
 }
 
 async function openThread(id) {
@@ -337,7 +371,13 @@ async function openThread(id) {
         else if (m.role === "tool") { ensureAssistant(); toolCard({id:"h"+Math.random(), server:m.server, tool:m.tool, arguments:m.arguments, status:"completed", result:m.result}, false); }
       });
     }
-  } catch (e) { showEmpty(); }
+    const hasVersionInfo = d.currentInstructionsVersion !== undefined && d.currentInstructionsVersion !== null;
+    if (hasVersionInfo && d.instructionsVersion !== d.currentInstructionsVersion) {
+      const banner = document.createElement("div"); banner.className = "stale-banner";
+      banner.textContent = "⚠ このスレッドは古い指示で動作しています。最新の動作には新しいチャットを開始してください。";
+      chatInner.insertBefore(banner, chatInner.firstChild);
+    }
+  } catch (e) { showLoadError(id); }
   loadThreads();
 }
 
@@ -387,7 +427,7 @@ async function readSSE(stream) {
       let ev = "message", data = "";
       raw.split("\n").forEach(line => {
         if (line.startsWith("event:")) ev = line.slice(6).trim();
-        else if (line.startsWith("data:")) data += line.slice(5).trim();
+        else if (line.startsWith("data:")) data += (data ? "\n" : "") + line.slice(5).replace(/^ /, "");
       });
       if (data) { try { handleEvent(ev, JSON.parse(data)); } catch(e){} }
     }

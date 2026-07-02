@@ -18,6 +18,7 @@ work happens off Audacity's UI thread (no freeze, no rebuild).  Stdlib only.
 import glob
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -118,6 +119,27 @@ def _validate_input_audio(path):
     return None
 
 
+def _run_with_pgroup_kill(cmd, timeout):
+    """Like subprocess.run(..., capture_output=True, text=True, timeout=timeout)
+    but on timeout, kills the whole process group (audio-separator/torch can
+    spawn worker children that survive a plain process.kill()) before
+    collecting output. Mirrors subprocess.run's return shape (a CompletedProcess)
+    and re-raises TimeoutExpired like subprocess.run does."""
+    p = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        start_new_session=True)
+    try:
+        out, err = p.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+        except Exception:
+            pass
+        out, err = p.communicate()
+        raise subprocess.TimeoutExpired(cmd, timeout, output=out, stderr=err)
+    return subprocess.CompletedProcess(cmd, p.returncode, out, err)
+
+
 def do_separate(args):
     inp = args.get("input_path", "")
     if not inp or not os.path.isfile(inp):
@@ -141,7 +163,7 @@ def do_separate(args):
            "--model_file_dir", str(MODELS_DIR),
            "--output_format", "WAV"]
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+        p = _run_with_pgroup_kill(cmd, timeout=3600)
     except subprocess.TimeoutExpired:
         return _text("separation timed out (over 60 min).", True)
     except Exception as e:

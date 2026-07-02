@@ -31,6 +31,11 @@ from pathlib import Path
 
 from codex_bridge import CodexAppServer, CodexError, _PROCESS_DOWN
 
+# Bumped whenever DEV_INSTRUCTIONS changes meaningfully. Recorded per-thread in
+# thread_meta.json at thread/start time so the UI can flag threads that were
+# started under an older prompt (see /api/threads, /api/thread).
+INSTRUCTIONS_VERSION = 2
+
 
 # --------------------------------------------------------------------------- #
 # Config
@@ -76,6 +81,14 @@ BASE_DIR = Path(__file__).parent.resolve()
 COMPANION_HOST = os.environ.get("COMPANION_HOST", "127.0.0.1")
 COMPANION_PORT = int(os.environ.get("COMPANION_PORT", "8765"))
 
+# Origins allowed to talk to this localhost server (CORS + Origin-header gate
+# on state-changing POSTs). Built from COMPANION_HOST/PORT rather than "*" so a
+# malicious page in another tab cannot drive the companion / Audacity.
+ALLOWED_ORIGINS = {
+    f"http://{COMPANION_HOST}:{COMPANION_PORT}",
+    f"http://localhost:{COMPANION_PORT}",
+}
+
 # Audacity's MCP server (the in-app mod-mcp-server).
 MCP_URL = os.environ.get("MCP_URL", "http://127.0.0.1:4830/mcp")
 
@@ -93,6 +106,12 @@ CODEX_MODEL = os.environ.get("CODEX_MODEL", "").strip()
 GLOBAL_CODEX_HOME = Path(os.environ.get(
     "GLOBAL_CODEX_HOME", str(Path.home() / ".codex")))
 
+# Runtime state (NOT committed — see .gitignore): maps threadId -> metadata,
+# currently just {"instructionsVersion": N} recorded when the thread was
+# started. Lets the UI flag threads whose developer instructions are stale.
+THREAD_META_PATH = BASE_DIR / "thread_meta.json"
+_thread_meta_lock = threading.Lock()
+
 DEV_INSTRUCTIONS = """あなたは「Otis」というチャット内のアシスタントで、音声編集ソフト Otis を操作します。返答は必ず日本語で、簡潔に行ってください。
 
 使えるツール:
@@ -101,6 +120,9 @@ DEV_INSTRUCTIONS = """あなたは「Otis」というチャット内のアシス
   "Tone: Frequency=440 Amplitude=0.5 Waveform=Sine Start=0 End=3" /
   "Amplify: Ratio=0.5" / "Normalize:" / "Import2: Filename=/path/in.wav" /
   "Export2: Filename=/tmp/out.wav"
+  スペースを含むパス・値は必ず二重引用符で囲むこと（例:
+  Import2: Filename="/path with spaces/in.wav"）。引用符なしでスペースを
+  含めると値が途中で切り詰められ、意図しないファイルが開かれる/書き出される。
 - get_info: Otis の状態を取得します。type=Tracks / Selection / Clips / Labels、
   または type=Commands で全コマンドのカタログ（パラメータ付き）。
   run_command 経由の解析コマンドもあります: "GetAudioStats:" "GetSpectrum:"
@@ -108,26 +130,28 @@ DEV_INSTRUCTIONS = """あなたは「Otis」というチャット内のアシス
   クリップ、LUFS、スペクトル、無音、オンセット等を JSON で返す）。
 - separate_stems: 音声ファイルをステム（ボーカル/インスト等）に分離します
   （UVR/audio-separator）。ステム分離を頼まれたら次の手順で行う:
-    1) run_command で "SelectAll:" を実行し、プロジェクト全体を選択する
-       （これをしないと Export2 がほぼ空のファイルになります）。
-    2) run_command で "Export2: Filename=/tmp/aud_stem_src.wav NumChannels=2"
-       を実行し、現在のプロジェクトを WAV に書き出す。
-    3) separate_stems(input_path="/tmp/aud_stem_src.wav") を呼ぶ。既定モデルは
+    1) run_command で "Export2: Filename=/tmp/aud_stem_src.wav NumChannels=2"
+       を実行し、対象を WAV に書き出す。選択範囲があればその範囲が、
+       選択範囲が無ければプロジェクト全体が自動的に書き出される。
+       プロジェクト全体を明示的に書き出したい場合は、先に run_command で
+       "SelectAll:" を実行してから Export2 してもよい。
+    2) separate_stems(input_path="/tmp/aud_stem_src.wav") を呼ぶ。既定モデルは
        Vocals/Instrumental。4ステム(vocals/drums/bass/other)は
        model="htdemucs.yaml"。利用可能なモデルは list_stem_models で確認。
-    4) 返ってきた各ステムのファイルパスを run_command の
+    3) 返ってきた各ステムのファイルパスを run_command の
        Import2: Filename=... で Otis に読み込む。
-    5) どのモデルで分離し、どのトラックを追加したかを日本語で報告する。
+    4) どのモデルで分離し、どのトラックを追加したかを日本語で報告する。
     （分離には数分かかることがあります。）
 - transcribe_audio: 音声をローカル Whisper で文字起こしします（APIキー不要・
   端末内で処理）。文字起こしを頼まれたら:
-    1) run_command で "SelectAll:" を実行し、プロジェクト全体を選択する
-       （選択範囲が無いと Export2 がほぼ空のファイルになります）。
-    2) run_command で Export2: Filename=/tmp/aud_transcribe_src.wav を実行し、
-       対象（プロジェクトまたは選択範囲）を WAV に書き出す。
-    3) transcribe_audio(input_path="/tmp/aud_transcribe_src.wav") を呼ぶ。
+    1) run_command で Export2: Filename=/tmp/aud_transcribe_src.wav を実行し、
+       対象を WAV に書き出す。選択範囲があればその範囲が、選択範囲が無ければ
+       プロジェクト全体が自動的に書き出される。プロジェクト全体を明示的に
+       書き出したい場合は、先に run_command で "SelectAll:" を実行してから
+       Export2 してもよい。
+    2) transcribe_audio(input_path="/tmp/aud_transcribe_src.wav") を呼ぶ。
        言語が分かっていれば language="ja" 等を指定（省略で自動判定）。
-    4) 返ってきた全文を日本語で提示する。タイムスタンプ付きセグメントも返るので、
+    3) 返ってきた全文を日本語で提示する。タイムスタンプ付きセグメントも返るので、
        ユーザーが望めば run_command でラベルトラック化もできる。
 
 作法:
@@ -144,6 +168,46 @@ DEV_INSTRUCTIONS = """あなたは「Otis」というチャット内のアシス
 - 「クリップしてる?」「音量は?」等は解析コマンドで測ってから数値で判断する。
 - 破壊的操作やファイル書き出しの前は、明確な指示がない限り確認する。
 - 返答は日本語で簡潔に。実行した操作と結果を述べる。"""
+
+
+# --------------------------------------------------------------------------- #
+# Thread metadata (instructionsVersion tracking)
+# --------------------------------------------------------------------------- #
+
+def _read_thread_meta():
+    try:
+        with _thread_meta_lock:
+            if not THREAD_META_PATH.is_file():
+                return {}
+            return json.loads(THREAD_META_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _record_thread_meta(thread_id, instructions_version=INSTRUCTIONS_VERSION):
+    """Record {"<thread_id>": {"instructionsVersion": N}} in thread_meta.json.
+    Atomic write (tmp file + os.replace) so a crash mid-write can't corrupt the
+    file for concurrent readers."""
+    with _thread_meta_lock:
+        try:
+            data = json.loads(THREAD_META_PATH.read_text(encoding="utf-8")) \
+                if THREAD_META_PATH.is_file() else {}
+        except Exception:
+            data = {}
+        data[thread_id] = {"instructionsVersion": instructions_version}
+        tmp_path = THREAD_META_PATH.with_suffix(".json.tmp")
+        try:
+            tmp_path.write_text(json.dumps(data), encoding="utf-8")
+            os.replace(tmp_path, THREAD_META_PATH)
+        except Exception as e:
+            print("[thread_meta] failed to write:", e)
+
+
+def _thread_instructions_version(thread_id):
+    meta = _read_thread_meta().get(thread_id)
+    if not meta:
+        return None
+    return meta.get("instructionsVersion")
 
 
 # --------------------------------------------------------------------------- #
@@ -253,6 +317,26 @@ def setup_codex_home():
 bridge = None  # type: CodexAppServer | None
 _bridge_lock = threading.Lock()
 
+# Thread ids with a turn currently in flight (prevents overlapping /api/chat
+# POSTs to the same thread, which otherwise corrupt Codex's turn state).
+_inflight_threads = set()
+_inflight_lock = threading.Lock()
+
+
+def _try_mark_inflight(thread_id):
+    """Atomically mark thread_id as in-flight. Returns False if it already was
+    (caller should reject with 409)."""
+    with _inflight_lock:
+        if thread_id in _inflight_threads:
+            return False
+        _inflight_threads.add(thread_id)
+        return True
+
+
+def _clear_inflight(thread_id):
+    with _inflight_lock:
+        _inflight_threads.discard(thread_id)
+
 
 def get_bridge():
     global bridge
@@ -283,7 +367,9 @@ def start_thread(b):
         "developerInstructions": DEV_INSTRUCTIONS,
     }
     resp = b.request("thread/start", params, timeout=60)
-    return resp["thread"]["id"], resp
+    thread_id = resp["thread"]["id"]
+    _record_thread_meta(thread_id)
+    return thread_id, resp
 
 
 # --------------------------------------------------------------------------- #
@@ -307,12 +393,29 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception:
             return {}
 
+    def _cors_origin(self):
+        """Echo back the request Origin if it's one of ours, else fall back to
+        the primary allowed origin. Never "*" — this is a localhost tool that
+        can drive Audacity, so we don't want any page in any tab to reach it."""
+        origin = self.headers.get("Origin")
+        if origin in ALLOWED_ORIGINS:
+            return origin
+        return f"http://{COMPANION_HOST}:{COMPANION_PORT}"
+
+    def _origin_allowed(self):
+        """Origin gate for state-changing POSTs. No Origin header (curl, other
+        local tools) is allowed through; a present-but-foreign Origin is not."""
+        origin = self.headers.get("Origin")
+        if origin is None:
+            return True
+        return origin in ALLOWED_ORIGINS
+
     def send_json(self, data, status=200):
         body = json.dumps(data).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", self._cors_origin())
         self.end_headers()
         self.wfile.write(body)
 
@@ -334,7 +437,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "close")
         self.send_header("X-Accel-Buffering", "no")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", self._cors_origin())
         self.end_headers()
 
     def _sse(self, event, data):
@@ -348,7 +451,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", self._cors_origin())
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("Content-Length", "0")
@@ -376,9 +479,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.send_json({"error": "Not found"}, 404)
         except (BrokenPipeError, ConnectionResetError):
             pass
-        except Exception:
+        except Exception as e:
+            traceback.print_exc()
             try:
-                self.send_json({"error": traceback.format_exc()}, 500)
+                self.send_json({"error": str(e)}, 500)
             except Exception:
                 pass
 
@@ -386,6 +490,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             path = self.path.split("?")[0]
+            if not self._origin_allowed():
+                self.send_json({"error": "forbidden origin"}, 403)
+                return
             if path == "/api/chat":
                 self.handle_chat()
             elif path == "/api/login":
@@ -400,9 +507,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.send_json({"error": "Not found"}, 404)
         except (BrokenPipeError, ConnectionResetError):
             pass
-        except Exception:
+        except Exception as e:
+            traceback.print_exc()
             try:
-                self.send_json({"error": traceback.format_exc()}, 500)
+                self.send_json({"error": str(e)}, 500)
             except Exception:
                 pass
 
@@ -489,8 +597,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "preview": (t.get("preview") or "").strip()[:120],
                 "createdAt": t.get("createdAt"),
                 "updatedAt": t.get("updatedAt"),
+                "instructionsVersion": _thread_instructions_version(t.get("id")),
             })
-        self.send_json({"threads": threads})
+        self.send_json({"threads": threads,
+                         "currentInstructionsVersion": INSTRUCTIONS_VERSION})
 
     def handle_thread_read(self):
         from urllib.parse import urlparse, parse_qs
@@ -512,7 +622,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except CodexError as e:
             self.send_json({"error": str(e)}, 500)
             return
-        self.send_json({"messages": _extract_messages(resp)})
+        self.send_json({"messages": _extract_messages(resp),
+                         "instructionsVersion": _thread_instructions_version(tid),
+                         "currentInstructionsVersion": INSTRUCTIONS_VERSION})
 
     def handle_interrupt(self):
         body = self._read_body()
@@ -547,28 +659,26 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json({"error": "empty message"}, 400)
             return
 
-        try:
-            b = get_bridge()
-        except Exception as e:
-            self.send_json({"error": f"Codex app-server failed to start: {e}"}, 500)
+        # Reject overlapping turns on the same existing thread before we do
+        # anything else (new threads get a fresh id below, so they can't
+        # collide with each other). Cleared in the `finally` below regardless
+        # of how the turn ends (success, exception, or timeout).
+        if thread_id and not _try_mark_inflight(thread_id):
+            self.send_json({
+                "error": "このスレッドは前のターンを実行中です。完了を待つか、"
+                         "新しいチャットを開始してください。"}, 409)
             return
+        marked_thread_id = thread_id  # what we actually marked in-flight (or None)
 
-        new_thread = False
-        if not thread_id:
+        try:
             try:
-                thread_id, _ = start_thread(b)
-                new_thread = True
-                b.loaded_threads.add(thread_id)
-            except CodexError as e:
-                self.send_json({"error": str(e)}, 500)
+                b = get_bridge()
+            except Exception as e:
+                self.send_json({"error": f"Codex app-server failed to start: {e}"}, 500)
                 return
-        elif thread_id not in b.loaded_threads:
-            # Fresh app-server: load the thread from disk before the turn.
-            try:
-                b.request("thread/resume", {"threadId": thread_id}, timeout=60)
-                b.loaded_threads.add(thread_id)
-            except CodexError:
-                # Thread is gone (or unreadable) — start a new one instead.
+
+            new_thread = False
+            if not thread_id:
                 try:
                     thread_id, _ = start_thread(b)
                     new_thread = True
@@ -576,41 +686,70 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 except CodexError as e:
                     self.send_json({"error": str(e)}, 500)
                     return
+                # The new thread's id is only known now — mark it in-flight so a
+                # (very unlikely) racing request against the same id is caught.
+                if not _try_mark_inflight(thread_id):
+                    self.send_json({"error": "duplicate thread id"}, 409)
+                    return
+                marked_thread_id = thread_id
+            elif thread_id not in b.loaded_threads:
+                # Fresh app-server: load the thread from disk before the turn.
+                try:
+                    b.request("thread/resume", {"threadId": thread_id}, timeout=60)
+                    b.loaded_threads.add(thread_id)
+                except CodexError:
+                    # Thread is gone (or unreadable) — start a new one instead.
+                    _clear_inflight(marked_thread_id)
+                    marked_thread_id = None
+                    try:
+                        thread_id, _ = start_thread(b)
+                        new_thread = True
+                        b.loaded_threads.add(thread_id)
+                    except CodexError as e:
+                        self.send_json({"error": str(e)}, 500)
+                        return
+                    if not _try_mark_inflight(thread_id):
+                        self.send_json({"error": "duplicate thread id"}, 409)
+                        return
+                    marked_thread_id = thread_id
 
-        q = b.subscribe(thread_id)
-        self._sse_open()
-        self._sse("meta", {"threadId": thread_id, "newThread": new_thread})
+            q = b.subscribe(thread_id)
+            self._sse_open()
+            self._sse("meta", {"threadId": thread_id, "newThread": new_thread})
 
-        # Kick off the turn in a background thread so we can stream immediately.
-        turn_err = {}
+            # Kick off the turn in a background thread so we can stream immediately.
+            turn_err = {}
 
-        def _start_turn():
+            def _start_turn():
+                try:
+                    b.request(
+                        "turn/start",
+                        {"threadId": thread_id,
+                         "input": [{"type": "text", "text": message}]},
+                        timeout=4000,
+                    )
+                except CodexError as e:
+                    turn_err["error"] = str(e)
+
+            tt = threading.Thread(target=_start_turn, daemon=True)
+            tt.start()
+
             try:
-                b.request(
-                    "turn/start",
-                    {"threadId": thread_id,
-                     "input": [{"type": "text", "text": message}]},
-                    timeout=900,
-                )
-            except CodexError as e:
-                turn_err["error"] = str(e)
-
-        tt = threading.Thread(target=_start_turn, daemon=True)
-        tt.start()
-
-        try:
-            self._stream_turn(q, thread_id)
+                self._stream_turn(q, thread_id)
+            finally:
+                b.unsubscribe(thread_id, q)
+            if turn_err.get("error"):
+                try:
+                    self._sse("error", {"message": turn_err["error"]})
+                except Exception:
+                    pass
         finally:
-            b.unsubscribe(thread_id, q)
-        if turn_err.get("error"):
-            try:
-                self._sse("error", {"message": turn_err["error"]})
-            except Exception:
-                pass
+            if marked_thread_id:
+                _clear_inflight(marked_thread_id)
 
     def _stream_turn(self, q, thread_id):
         import queue as _queue
-        idle_deadline = 900  # seconds of total silence before giving up
+        idle_deadline = 4000  # seconds of total silence before giving up
         while True:
             try:
                 msg = q.get(timeout=idle_deadline)
@@ -732,6 +871,17 @@ def main():
     print(f"  CODEX_HOME  : {CODEX_HOME}")
     print(f"  Model       : {CODEX_MODEL or '(account default)'}")
 
+    # Bind the port FIRST, before warm-starting the Codex app-server: an
+    # accidental second launch should fail fast on the port conflict instead
+    # of spawning (and then orphaning) another codex subprocess.
+    try:
+        server = http.server.ThreadingHTTPServer((COMPANION_HOST, COMPANION_PORT), Handler)
+    except OSError as e:
+        print(f"ポート {COMPANION_PORT} は使用中です — companion が既に起動している"
+              f"可能性があります。http://{COMPANION_HOST}:{COMPANION_PORT} を開くか、"
+              f"既存プロセスを停止してください。({e})")
+        sys.exit(1)
+
     # Warm-start the app server so the first chat is fast and we surface auth
     # problems early.
     try:
@@ -754,7 +904,6 @@ def main():
     ok, tools, err = _audacity_mcp_status()
     print(f"  Audacity    : {'connected, tools=' + str(tools) if ok else 'NOT reachable (' + str(err) + ')'}")
 
-    server = http.server.ThreadingHTTPServer((COMPANION_HOST, COMPANION_PORT), Handler)
     print("Press Ctrl+C to stop.")
     try:
         server.serve_forever()

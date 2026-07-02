@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 # Isolated Codex home: ChatGPT auth tokens, thread/rollout history, generated config
 .codex/
+# Runtime state: per-thread developer-instructions version tracking
+thread_meta.json

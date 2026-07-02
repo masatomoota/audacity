@@ -169,6 +169,10 @@ class CodexAppServer:
                 self._proc.kill()
             except Exception:
                 pass
+            try:
+                self._proc.wait(timeout=5)
+            except Exception:
+                pass
 
     # ------------------------------------------------------------- transport
     def _alloc_id(self):

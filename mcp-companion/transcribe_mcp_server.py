@@ -20,6 +20,7 @@ the mlx_whisper subprocess. Mirrors stem_mcp_server.py.
 
 import json
 import os
+import signal
 import subprocess
 import sys
 import urllib.request
@@ -163,6 +164,27 @@ def _validate_input_audio(path):
     return None
 
 
+def _run_with_pgroup_kill(cmd, timeout):
+    """Like subprocess.run(..., capture_output=True, text=True, timeout=timeout)
+    but on timeout, kills the whole process group (mlx_whisper can spawn worker
+    children that survive a plain process.kill()) before collecting output.
+    Mirrors subprocess.run's return shape (a CompletedProcess) and re-raises
+    TimeoutExpired like subprocess.run does. Mirrors stem_mcp_server.py."""
+    p = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        start_new_session=True)
+    try:
+        out, err = p.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+        except Exception:
+            pass
+        out, err = p.communicate()
+        raise subprocess.TimeoutExpired(cmd, timeout, output=out, stderr=err)
+    return subprocess.CompletedProcess(cmd, p.returncode, out, err)
+
+
 def do_transcribe(args):
     inp = args.get("input_path", "")
     if not inp or not os.path.isfile(inp):
@@ -192,7 +214,7 @@ def do_transcribe(args):
     if language:
         cmd += ["--language", language]
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+        p = _run_with_pgroup_kill(cmd, timeout=3600)
     except subprocess.TimeoutExpired:
         return _text("transcription timed out (over 60 min).", True)
     except Exception as e:
