@@ -74,10 +74,17 @@ public:
                    0)
    {
       SetExpandEnvVars(false);
-      SetParameters(parms);
+      mWasWellFormed = SetParameters(parms);
    }
 
    virtual ~CommandParameters();
+
+   // False if SetParameters() encountered a token that could not be
+   // interpreted as key=value (e.g. an unquoted value containing a space
+   // that got split into a piece with no '='). Callers that only inspect
+   // individual keys via ReadAndVerify() would otherwise silently fall
+   // back to defaults instead of surfacing the malformed input.
+   bool WasWellFormed() const { return mWasWellFormed; }
 
    virtual bool HasGroup(const wxString & strName) const override
    {
@@ -288,10 +295,25 @@ public:
    {
       wxFileConfig::SetPath(wxT("/"));
 
-      auto parsed = wxCmdLineParser::ConvertStringToArgs(parms);
+      // wxCMD_LINE_SPLIT_UNIX (rather than the default wxCMD_LINE_SPLIT_DOS)
+      // understands both single- and double-quoted values, so that arguments
+      // like Filename="/path with spaces/x.wav" are kept together instead of
+      // being split on the embedded spaces.
+      auto parsed =
+         wxCmdLineParser::ConvertStringToArgs(parms, wxCMD_LINE_SPLIT_UNIX);
 
       for (size_t i = 0, cnt = parsed.size(); i < cnt; i++)
       {
+         if (!parsed[i].Contains(wxT("=")))
+         {
+            // A token with no '=' means splitting produced a fragment that
+            // doesn't parse as key=value -- most commonly an unquoted value
+            // containing a space. Silently dropping it would let, e.g.,
+            // Filename=/path with space/x.wav be truncated to
+            // Filename=/path without any indication of failure.
+            return false;
+         }
+
          wxString key = parsed[i].BeforeFirst(wxT('=')).Trim(false).Trim(true);
          wxString val = parsed[i].AfterFirst(wxT('=')).Trim(false).Trim(true);
 
@@ -335,6 +357,9 @@ public:
 
       return val;
    }
+
+private:
+   bool mWasWellFormed{ true };
 };
 
 #endif

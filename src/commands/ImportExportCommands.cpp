@@ -114,6 +114,24 @@ bool ExportCommand::Apply(const CommandContext & context)
    auto &selectedRegion = ViewInfo::Get( context.project ).selectedRegion;
    t0 = selectedRegion.t0();
    t1 = selectedRegion.t1();
+   bool selectedOnly = true;
+
+   // If nothing is selected, fall back to exporting the whole project
+   // instead of silently producing an empty/near-empty file.
+   if (t1 <= t0)
+   {
+      auto &tracks = TrackList::Get(context.project);
+      t0 = 0;
+      t1 = tracks.GetEndTime();
+      selectedOnly = false;
+
+      if (t1 <= t0)
+      {
+         context.Error(wxT(
+            "Nothing to export: project is empty and no selection was made."));
+         return false;
+      }
+   }
 
    // Find the extension and check it's valid
    int splitAt = mFileName.Find(wxUniChar('.'), true);
@@ -135,9 +153,9 @@ bool ExportCommand::Apply(const CommandContext & context)
          .SetParameters(ExportUtils::ParametersFromEditor(*editor))
          .SetNumChannels(std::max(0, mnChannels))
          .SetSampleRate(ProjectRate::Get(context.project).GetRate())
-         .SetPlugin(plugin)
+         .SetPlugin(plugin, formatIndex)
          .SetFileName(mFileName)
-         .SetRange(t0, t1, true);
+         .SetRange(t0, t1, selectedOnly);
 
       auto result = ExportResult::Error;
       ExportProgressUI::ExceptionWrappedCall([&]

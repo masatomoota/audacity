@@ -133,6 +133,22 @@ bool AudacityCommand::LoadSettingsFromString(const wxString & parms)
    wxString preset = parms;
 
    CommandParameters eap(parms);
+   if (!eap.WasWellFormed())
+   {
+      // The parameter string had a token that didn't parse as key=value
+      // (most likely an unquoted value containing a space). Rather than
+      // silently apply whatever partial/truncated settings did parse,
+      // report a visible failure so the caller (e.g. the MCP relay) can
+      // surface it instead of quietly doing the wrong thing.
+      // Deliberately NOT a modal MessageBox: this path is reached almost
+      // exclusively from scripting (macros / mod-mcp-server), where a modal
+      // dialog would block the app until a human dismisses it.
+      wxLogError(
+"%s: Could not parse settings string (unquoted value containing a space?). Values with spaces must be quoted, e.g. Filename=\"/path with spaces/x.wav\". Input: %s",
+         GetName().Translation(), preset);
+      return false;
+   }
+
    ShuttleSetAutomation S;
 
    S.SetForWriting( &eap );

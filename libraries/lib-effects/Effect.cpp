@@ -20,6 +20,7 @@
 #include <algorithm>
 
 #include <wx/defs.h>
+#include <wx/log.h>
 
 #include "BasicUI.h"
 #include "ConfigInterface.h"
@@ -257,6 +258,23 @@ OptionalMessage Effect::LoadSettingsFromString(
       // or use LoadSettings.
       // This interprets what was written by SaveSettings, above.
       CommandParameters eap(parms);
+      if (!eap.WasWellFormed())
+      {
+         // A token didn't parse as key=value (most likely an unquoted
+         // value containing a space, e.g. Filename=/path with space/x.wav
+         // being silently truncated to Filename=/path). Unlike an
+         // individual field failing validation (handled below via S.bOK,
+         // which falls back to defaults), this means the input itself is
+         // unusable, so fail outright instead of silently proceeding with
+         // whatever partial settings happened to parse.
+         // Deliberately NOT a modal message box: this path is reached almost
+         // exclusively from scripting (macros / mod-mcp-server), where a
+         // modal dialog would block the app until a human dismisses it.
+         wxLogError(
+"%s: Could not parse settings string (unquoted value containing a space?). Values with spaces must be quoted, e.g. Filename=\"/path with spaces/x.wav\". Input: %s",
+            GetName().Translation(), preset);
+         return {};
+      }
       ShuttleSetAutomation S;
       S.SetForValidating( &eap );
       // VisitSettings returns false if not defined for this effect.
