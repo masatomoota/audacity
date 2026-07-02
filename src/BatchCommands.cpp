@@ -544,9 +544,10 @@ bool MacroCommands::ApplyEffectCommand(
    {
       if( !SelectUtilities::SelectAllIfNoneAndAllowed( *project ) )
       {
-         AudacityMessageBox(
+         Context.Error(
             // i18n-hint: %s will be replaced by the name of an action, such as "Remove Tracks".
-            XO("\"%s\" requires one or more tracks to be selected.").Format(friendlyCommand));
+            XO("\"%s\" requires one or more tracks to be selected.")
+               .Format(friendlyCommand).Translation());
          return false;
       }
    }

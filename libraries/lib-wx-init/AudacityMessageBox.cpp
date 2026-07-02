@@ -12,12 +12,16 @@
 #include "Internat.h"
 
 #include "Journal.h"
+#include "ScriptModalGuard.h"
 #include "wxArrayStringEx.h"
 
 int AudacityMessageBox(const TranslatableString& message,
    const TranslatableString& caption,
    long style, wxWindow *parent, int x, int y)
 {
+   if (ScriptModalGuard::IsActive())
+      return ScriptModalGuard::RecordAndSuppress(message.Translation(), style);
+
    // wxMessageBox is implemented with native message boxes and does not
    // use the wxWidgets message machinery.  Therefore the wxEventFilter that
    // most journal recording relies on fails us here.  So if replaying, don't

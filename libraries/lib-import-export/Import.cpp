@@ -635,11 +635,18 @@ bool Importer::Import(
       struct stat s;
       memset(&s, 0, sizeof(struct stat));
       auto err = stat(fName.data(), &s);
-      if(err != 0 || (S_ISREG(s.st_mode) && s.st_blocks == 0))
+      // A file stored in iCloud/Dropbox may exist only as a dataless
+      // placeholder (stat succeeds but st_blocks == 0) until the OS downloads
+      // it on demand; wait for that download to finish.  A file that does not
+      // exist at all (stat fails) must NOT be waited for — otherwise a
+      // scripted Import2 of a bad path would spin here forever behind a modal
+      // progress dialog.  Instead we fall through and let plugin->Open() fail
+      // cleanly, surfacing a normal "Opening failed" error to the caller.
+      if(err == 0 && S_ISREG(s.st_mode) && s.st_blocks == 0)
       {
          int dialogStyle = BasicUI::ProgressCanAbort | BasicUI::ProgressAppModal | BasicUI::ProgressShowElapsedTime | BasicUI::ProgressSmooth;
          auto dialog = BasicUI::MakeGenericProgress({}, XO("Importing files"), XO("Importing %s...").Format(fName.AfterLast(wxFileName::GetPathSeparator())), dialogStyle);
-         while(err != 0 || s.st_blocks == 0)
+         while(err == 0 && S_ISREG(s.st_mode) && s.st_blocks == 0)
          {
             BasicUI::Yield();
             if(dialog->Pulse() != BasicUI::ProgressResult::Success)

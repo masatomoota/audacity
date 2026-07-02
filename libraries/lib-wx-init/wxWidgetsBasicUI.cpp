@@ -17,6 +17,7 @@ Paul Licameli
 #include "AudacityMessageBox.h"
 #include "ProgressDialog.h"
 #include "MultiDialog.h"
+#include "ScriptModalGuard.h"
 #include <wx/app.h>
 #include <wx/progdlg.h>
 #include <wx/windowptr.h>
@@ -49,6 +50,11 @@ void wxWidgetsBasicUI::DoShowErrorDialog(
    const BasicUI::ErrorDialogOptions &options)
 {
    using namespace BasicUI;
+   if (ScriptModalGuard::IsActive()) {
+      ScriptModalGuard::RecordAndSuppress(
+         dlogTitle.Translation() + wxT(": ") + message.Translation(), wxOK);
+      return;
+   }
    bool modal = true;
    auto parent = wxWidgetsWindowPlacement::GetParent(placement);
    switch (options.type) {
@@ -133,6 +139,24 @@ wxWidgetsBasicUI::DoMessageBox(
    // when none of the above were explicitly specified
    if (!style)
       style = wxOK | wxCENTRE;
+
+   // Suppress here (rather than falling through to AudacityMessageBox) to
+   // avoid double-capturing the same dialog in ScriptModalGuard's log.
+   if (ScriptModalGuard::IsActive()) {
+      auto suppressedResult =
+         ScriptModalGuard::RecordAndSuppress(message.Translation(), style);
+      switch (suppressedResult) {
+      case wxYES:
+         return MessageBoxResult::Yes;
+      case wxNO:
+         return MessageBoxResult::No;
+      case wxCANCEL:
+         return MessageBoxResult::Cancel;
+      case wxOK:
+      default:
+         return MessageBoxResult::Ok;
+      }
+   }
 
    // This calls through to ::wxMessageBox:
    auto wxResult =

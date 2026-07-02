@@ -72,6 +72,9 @@ bool ImportCommand::Apply(const CommandContext & context)
 
    if (success && wasEmpty)
       SelectUtilities::SelectAllIfNone( context.project );
+   else if (!success)
+      context.Error(wxString::Format(
+         wxT("Could not import \"%s\""), mFileName));
 
    return success;
 }

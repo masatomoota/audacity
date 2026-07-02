@@ -86,7 +86,12 @@ bool OpenProjectCommand::Apply(const CommandContext & context){
    // Because Open does not return a success or failure, we have to guess
    // at this point, based on whether the project file name has
    // changed and what to...
-   return !newFileName.empty() && newFileName != oldFileName;
+   const bool success = !newFileName.empty() && newFileName != oldFileName;
+   if (!success)
+      context.Error(mFileName.empty()
+         ? wxString(wxT("Could not open project"))
+         : wxString::Format(wxT("Could not open project \"%s\""), mFileName));
+   return success;
 }
 
 const ComponentInterfaceSymbol SaveProjectCommand::Symbol
@@ -122,10 +127,14 @@ void SaveProjectCommand::PopulateOrExchange(ShuttleGui & S)
 bool SaveProjectCommand::Apply(const CommandContext &context)
 {
    auto &projectFileManager = ProjectFileManager::Get( context.project );
-   if ( mFileName.empty() )
-      return projectFileManager.SaveAs();
-   else
-      return projectFileManager.SaveAs(mFileName, mbAddToHistory);
+   const bool success = mFileName.empty()
+      ? projectFileManager.SaveAs()
+      : projectFileManager.SaveAs(mFileName, mbAddToHistory);
+   if (!success)
+      context.Error(mFileName.empty()
+         ? wxString(wxT("Could not save project"))
+         : wxString::Format(wxT("Could not save project as \"%s\""), mFileName));
+   return success;
 }
 
 const ComponentInterfaceSymbol SaveCopyCommand::Symbol

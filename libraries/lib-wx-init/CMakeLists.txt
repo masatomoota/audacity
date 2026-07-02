@@ -33,6 +33,8 @@ set( SOURCES
    MultiDialog.h
    ProgressDialog.cpp
    ProgressDialog.h
+   ScriptModalGuard.cpp
+   ScriptModalGuard.h
    SelectFile.cpp
    SelectFile.h
    wxWidgetsBasicUI.cpp

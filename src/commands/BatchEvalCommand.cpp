@@ -18,7 +18,9 @@
 
 #include "CommandContext.h"
 #include "CommandDirectory.h"
+#include "MemoryX.h"
 #include "Project.h"
+#include "ScriptModalGuard.h"
 
 static CommandDirectory::RegisterType sRegisterType{
    std::make_unique<BatchEvalCommandType>()
@@ -47,11 +49,22 @@ OldStyleCommandPointer BatchEvalCommandType::Create( AudacityProject &project,
 
 bool BatchEvalCommand::Apply(const CommandContext & context)
 {
+   // Suppress any modal dialogs (message boxes, error dialogs) that would
+   // otherwise be shown while this scripted command runs, so a script can
+   // never wedge the application waiting on a human. Any suppressed
+   // message is surfaced below as a visible command failure instead.
+   ScriptModalGuard::Scope guard;
+   auto reportCaptured = finally([&context]{
+      wxString captured = ScriptModalGuard::TakeCaptured();
+      if (!captured.empty())
+         context.Error(captured);
+   });
+
    // Uh oh, I need to build a catalog, expensively
    // Maybe it can be built in one long-lived place and shared among command
    // objects instead?
-   // The catalog though may change during a session, as it includes the 
-   // names of macro commands - so the long-lived copy will need to 
+   // The catalog though may change during a session, as it includes the
+   // names of macro commands - so the long-lived copy will need to
    // be refreshed after macros are added/deleted.
    MacroCommandsCatalog catalog(&context.project);
 
